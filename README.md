@@ -1,2 +1,2 @@
-# ChatTuGraph
-Make TuGraph an intelligent graph database.
+# Chat2Graph
+An Agentic System on Graph Database.
