@@ -4,7 +4,7 @@ from typing import List, Union
 from app.memory.message import AgentMessage
 
 
-class Memory(ABC):
+class ReasonerMemory(ABC):
     """Agent message memory."""
 
     def __init__(self):
@@ -47,7 +47,7 @@ class Memory(ABC):
         """Get all the messages in the memory in json format."""
 
 
-class BuiltinMemory(Memory):
+class BuiltinReasonerMemory(ReasonerMemory):
     """Agent message memory."""
 
     def add_message(self, message: AgentMessage):
@@ -77,7 +77,7 @@ class BuiltinMemory(Memory):
     def get_message_by_id(self, message_id: str) -> Union[AgentMessage, None]:
         """Get a message by id."""
         for message in self._history_messages:
-            if message.msg_id == message_id:
+            if message.get_id() == message_id:
                 return message
 
         return None

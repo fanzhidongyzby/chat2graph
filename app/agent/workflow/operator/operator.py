@@ -3,19 +3,21 @@ from uuid import uuid4
 
 import networkx as nx  # type: ignore
 
-from app.agent.reasoner.dual_model import DualModelReasoner
+from app.agent.reasoner.dual_model_reasoner import DualModelReasoner
+from app.agent.reasoner.reasoner import ReasonerCaller
+from app.agent.task import Task
 from app.toolkit.action.action import Action
 from app.toolkit.tool.tool import Tool
 from app.toolkit.toolkit import Toolkit, ToolkitGraphType
 
 
-class Operator:
+class Operator(ReasonerCaller):
     """Operator is a sequence of actions and tools that need to be executed.
 
     Attributes:
         _id (str): The unique identifier of the operator.
         _reasoner (DualModelReasoner): The dual model reasoner.
-        _task (str): The task of the operator.
+        _operator_prompt_template (str): The prompt template of the operator.
         _toolkit (Toolkit): The toolkit that contains the actions and tools.
         _actions (List[Action]): The actions that need to be executed.
         _recommanded_actions (List[Action]): The recommanded actions from the toolkit.
@@ -24,19 +26,15 @@ class Operator:
 
     def __init__(
         self,
-        reasoner: DualModelReasoner,
-        task: str,
+        operator_prompt_template: str,
         toolkit: Toolkit,
         actions: List[Action],
-        op_id: str = str(uuid4()),
+        id: str = str(uuid4()),
     ):
-        self._id = op_id
-        self._reasoner: DualModelReasoner = reasoner
-        self._task: str = task
+        super().__init__(id=id)
 
+        self._operator_prompt_template: str = operator_prompt_template
         self._toolkit: Toolkit = toolkit
-        # if actions is None or not self.verify_actions(actions):
-        #     raise ValueError("Invalid actions in the toolkit.")
         self._actions: List[Action] = actions
         self._recommanded_actions: Optional[List[Action]] = None
 
@@ -49,17 +47,11 @@ class Operator:
             threshold=threshold, hops=hops
         )
 
-    @property
-    def id(self) -> str:
-        """Get the unique identifier of the operator."""
-        return self._id
-
     async def execute(
         self,
-        context: str,
-        scratchpad: str,
-        reasoning_rounds: int = 5,
-        print_messages: bool = True,
+        reasoner: DualModelReasoner,
+        task: Task,  # TODO: will change the name in the next PR
+        scratchpad: str,  # TODO: need to be removed
     ) -> Dict[str, str]:
         """Execute the operator by LLM client."""
         operator_prompt = await self.format_operation_prompt(
@@ -68,10 +60,9 @@ class Operator:
             scratchpad=scratchpad,
         )
         print(f"Operator prompt:\n{operator_prompt}")
-        result = await self._reasoner.infer(
-            op_id=self._id,
-            task=operator_prompt,
-            func_list=self.get_tools_from_actions(),
+
+        result = await reasoner.infer(
+            caller=self,
             reasoning_rounds=reasoning_rounds,
             print_messages=print_messages,
         )
@@ -172,6 +163,10 @@ class Operator:
             tool_docstrings=self.get_tool_docstrings(),
             scratchpad=scratchpad,
         )
+
+    def get_id(self) -> str:
+        """Get the id."""
+        return self._id
 
 
 OPERATION_PT = """

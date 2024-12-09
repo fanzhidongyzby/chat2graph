@@ -1,22 +1,42 @@
-from abc import ABC
 from dataclasses import dataclass
-from typing import List, Optional
 from uuid import uuid4
 
 
 @dataclass
-class Task(ABC):
-    """Task in the system."""
+class Task:
+    """Task in the system.
 
-    id: str
-    content: str
-    tags: List[str]
+    Attributes:
+        _session_id (str): The unique identifier of the session.
+        _goal (str): The goal of the task.
+        _id (str): The unique identifier of the task.
+        _context (str): The context of the task.
+    """
 
     def __init__(
         self,
-        content: str,
-        tags: Optional[List[str]] = None,
+        session_id: str,
+        goal: str,
+        id: str = str(uuid4()),
+        context: str = "",
     ):
-        self.id = str(uuid4())
-        self.content = content
-        self.tags = tags or []
+        self._session_id = session_id
+        self._goal = goal
+        self._id = id
+        self._context = context
+
+    def get_session_id(self) -> str:
+        """Get the unique identifier of the session."""
+        return self._session_id
+
+    def get_goal(self) -> str:
+        """Get the goal of the task."""
+        return self._goal
+
+    def get_id(self) -> str:
+        """Get the unique identifier of the task."""
+        return self._id
+
+    def get_context(self) -> str:
+        """Get the context of the task."""
+        return self._context
