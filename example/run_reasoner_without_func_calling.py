@@ -1,20 +1,9 @@
 import asyncio
 
+from app.agent.job import Job
 from app.agent.reasoner.dual_model_reasoner import DualModelReasoner
-from app.agent.reasoner.reasoner import ReasonerCaller
-from app.agent.task import Task
-
-
-class TestCaller(ReasonerCaller):
-    """Test ReasonerCaller for testing."""
-
-    def __init__(self):
-        super().__init__()
-        self._id = "test_caller_id"
-
-    def get_id(self) -> str:
-        """Get the unique identifier of the caller."""
-        return self._id
+from app.agent.reasoner.task import Task
+from app.agent.workflow.operator.operator import Operator, OperatorConfig
 
 
 async def main():
@@ -55,15 +44,21 @@ Scratchpad:
 
     reasoner = DualModelReasoner()
 
-    task = Task(
+    job = Job(
+        id="test_job_id",
         session_id="test_session_id",
-        id="test_task_id",
-        goal=graph_modeling_task,
+        goal="Test goal",
         context=graph_modeling_context,
     )
-    caller = TestCaller()
+    operator = Operator(
+        config=OperatorConfig(
+            instruction=graph_modeling_task,
+            actions=[],
+        )
+    )
+    task = Task(job=job, operator=operator)
 
-    await reasoner.infer(task=task, tools=[], caller=caller)
+    await reasoner.infer(task=task)
 
 
 if __name__ == "__main__":

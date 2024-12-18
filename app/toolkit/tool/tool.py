@@ -1,25 +1,41 @@
 from abc import ABC
-from dataclasses import dataclass
-from typing import Callable, Optional, Type
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel
+
+@dataclass
+class FunctionCallResult:
+    """Tool output."""
+
+    func_name: str
+    func_args: Dict[str, Any]
+    call_objective: str
+    output: str
+    status: Literal["succeeded", "failed"] = field(default="succeeded")
+
+    @classmethod
+    def error(cls, error_message: str) -> "FunctionCallResult":
+        """Create a FunctionCallResult instance for error cases.
+
+        Args:
+            error_message: The error message to include
+
+        Returns:
+            FunctionCallResult configured for error case.
+        """
+        return cls(
+            func_name="",
+            func_args={},
+            call_objective="",
+            output=error_message,
+            status="failed",
+        )
 
 
 @dataclass
 class Tool(ABC):
     """Tool in the toolkit."""
 
-    id: str
     function: Callable
-    args_schema: Type[BaseModel]
-
-    def __init__(
-        self,
-        function: Callable,
-        args_schema: Type[BaseModel],
-        tool_id: Optional[str] = None,
-    ):
-        self.id = tool_id or str(uuid4())
-        self.function = function
-        self.args_schema = args_schema
+    id: str = field(default_factory=lambda: str(uuid4()))

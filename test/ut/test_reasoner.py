@@ -1,32 +1,37 @@
 import time
-from typing import List
+from typing import List, Optional
 from unittest.mock import AsyncMock
 
 import pytest
 
+from app.agent.job import Job
 from app.agent.reasoner.dual_model_reasoner import DualModelReasoner
-from app.agent.reasoner.reasoner import ReasonerCaller
-from app.agent.task import Task
+from app.agent.reasoner.task import Task
+from app.agent.workflow.operator.operator import Operator
+from app.agent.workflow.operator.operator_config import OperatorConfig
 from app.commom.type import MessageSourceType
-from app.memory.message import AgentMessage
-
-
-class TestCaller(ReasonerCaller):
-    """Test ReasonerCaller for testing."""
-
-    def __init__(self):
-        super().__init__()
-        self._id = "test_caller_id"
-
-    def get_id(self) -> str:
-        """Get the unique identifier of the caller."""
-        return self._id
+from app.memory.message import ModelMessage
+from app.toolkit.tool.tool import Tool
 
 
 @pytest.fixture
-def caller():
-    """Create a standard ReasonerCaller for testing."""
-    return TestCaller()
+def operator():
+    """Create a test operator for testing."""
+    config = OperatorConfig(
+        instruction="Test instruction",
+        actions=[],
+    )
+    return Operator(config=config)
+
+
+@pytest.fixture
+def job():
+    """Create a test Job for testing."""
+    return Job(
+        id="test_job_id",
+        session_id="test_session_id",
+        goal="Test goal",
+    )
 
 
 @pytest.fixture
@@ -34,12 +39,12 @@ async def mock_reasoner() -> DualModelReasoner:
     """Create a DualModelReasoner with mocked model responses."""
     reasoner = DualModelReasoner()
 
-    actor_response = AgentMessage(
+    actor_response = ModelMessage(
         source_type=MessageSourceType.ACTOR,
         content="Scratchpad: Testing\nAction: Proceed\nFeedback: Success",
         timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
-    thinker_response = AgentMessage(
+    thinker_response = ModelMessage(
         source_type=MessageSourceType.THINKER,
         content="Instruction: Test instruction\nInput: Test input",
         timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -53,24 +58,20 @@ async def mock_reasoner() -> DualModelReasoner:
 
 @pytest.mark.asyncio
 async def test_infer_basic_flow(
-    mock_reasoner: DualModelReasoner, caller: ReasonerCaller
+    mock_reasoner: DualModelReasoner, job: Job, operator: Operator
 ):
     """Test basic inference flow with memory management."""
-    task = Task(
-        session_id="test_session_id",
-        goal="Test goal",
-        context="Test context",
-    )
+    task = Task(job=job, operator_config=operator._config)
 
     # run inference
-    _ = await mock_reasoner.infer(task=task, caller=caller)
+    _ = await mock_reasoner.infer(task=task)
 
     # verify model interactions
     assert mock_reasoner._actor_model.generate.called
     assert mock_reasoner._thinker_model.generate.called
 
     # verify memory management
-    reasoner_memory = mock_reasoner.get_memory(task=task, caller=caller)
+    reasoner_memory = mock_reasoner.get_memory(task=task)
     messages = reasoner_memory.get_messages()
 
     # check initial message
@@ -83,42 +84,41 @@ async def test_infer_basic_flow(
 
 @pytest.mark.asyncio
 async def test_infer_early_stop(
-    mock_reasoner: DualModelReasoner, caller: ReasonerCaller
+    mock_reasoner: DualModelReasoner, job: Job, operator: Operator
 ):
     """Test inference with early stop condition."""
     # modify actor response to trigger stop condition
-    stop_response = AgentMessage(
+    stop_response = ModelMessage(
         source_type=MessageSourceType.ACTOR,
         content="Scratchpad: Done\nAction: Complete\nFeedback: TASK_DONE",
         timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
+    mock_reasoner._thinker_model.generate = AsyncMock(return_value=stop_response)
     mock_reasoner._actor_model.generate = AsyncMock(return_value=stop_response)
 
-    task = Task(
-        session_id="test_session_id",
-        goal="Test goal",
-        context="Test context",
-    )
-    _ = await mock_reasoner.infer(task=task, caller=caller)
+    task = Task(job=job, operator_config=operator._config)
+    _ = await mock_reasoner.infer(task=task)
 
     # verify early stop
-    assert mock_reasoner._actor_model.generate.call_count == 1
     assert mock_reasoner._thinker_model.generate.call_count == 1
+    assert mock_reasoner._actor_model.generate.call_count == 1
 
 
 @pytest.mark.asyncio
 async def test_infer_multiple_rounds(
-    mock_reasoner: DualModelReasoner, caller: ReasonerCaller
+    mock_reasoner: DualModelReasoner, job: Job, operator: Operator
 ):
     """Test multiple rounds of inference with message accumulation."""
     round_count = 0
 
     async def generate_with_rounds(
-        sys_prompt: str, messages: List[AgentMessage]
-    ) -> AgentMessage:
+        sys_prompt: str,
+        messages: List[ModelMessage],
+        funcs: Optional[List[Tool]] = None,
+    ) -> ModelMessage:
         nonlocal round_count
         round_count += 1
-        return AgentMessage(
+        return ModelMessage(
             source_type=MessageSourceType.ACTOR
             if round_count % 2 == 0
             else MessageSourceType.THINKER,
@@ -130,15 +130,11 @@ async def test_infer_multiple_rounds(
     mock_reasoner._actor_model.generate = AsyncMock(side_effect=generate_with_rounds)
     mock_reasoner._thinker_model.generate = AsyncMock(side_effect=generate_with_rounds)
 
-    task = Task(
-        session_id="test_session_id",
-        goal="Test goal",
-        context="Test context",
-    )
-    _ = await mock_reasoner.infer(task=task, caller=caller)
+    task = Task(job=job, operator_config=operator._config)
+    _ = await mock_reasoner.infer(task=task)
 
     # verify message accumulation
-    reasoner_memory = mock_reasoner.get_memory(task=task, caller=caller)
+    reasoner_memory = mock_reasoner.get_memory(task=task)
     messages = reasoner_memory.get_messages()
 
     assert len(messages) > round_count  # Including initial message
@@ -150,7 +146,7 @@ async def test_infer_multiple_rounds(
 
 @pytest.mark.asyncio
 async def test_infer_error_handling(
-    mock_reasoner: DualModelReasoner, caller: ReasonerCaller
+    mock_reasoner: DualModelReasoner, job: Job, operator: Operator
 ):
     """Test inference error handling."""
     # simulate model generation error
@@ -159,30 +155,22 @@ async def test_infer_error_handling(
     )
 
     with pytest.raises(Exception) as exc_info:
-        task = Task(
-            session_id="test_session_id",
-            goal="Test goal",
-            context="Test context",
-        )
-        await mock_reasoner.infer(task=task, caller=caller)
+        task = Task(job=job, operator_config=operator._config)
+        await mock_reasoner.infer(task=task)
 
     assert str(exc_info.value) == "Model error"
 
-    reasoner_memory = mock_reasoner.get_memory(task=task, caller=caller)
+    reasoner_memory = mock_reasoner.get_memory(task=task)
     messages = reasoner_memory.get_messages()
     assert len(messages) == 1
     assert messages[0].get_source_type() == MessageSourceType.ACTOR
 
 
 @pytest.mark.asyncio
-async def test_infer_without_caller(mock_reasoner: DualModelReasoner):
-    """Test inference without caller (using temporary memory)."""
-    task = Task(
-        session_id="test_session_id",
-        goal="Test goal",
-        context="Test context",
-    )
-    _ = await mock_reasoner.infer(task=task, caller=None)
+async def test_infer_without_operator(mock_reasoner: DualModelReasoner, job: Job):
+    """Test inference without operator (using temporary memory)."""
+    task = Task(job=job)
+    _ = await mock_reasoner.infer(task=task)
 
     assert mock_reasoner._actor_model.generate.called
     assert mock_reasoner._thinker_model.generate.called
