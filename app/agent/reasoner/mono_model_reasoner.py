@@ -1,4 +1,3 @@
-import re
 import time
 from typing import Any, Dict, List, Optional
 
@@ -7,10 +6,7 @@ from app.agent.reasoner.model_service_factory import ModelServiceFactory
 from app.agent.reasoner.reasoner import Reasoner
 from app.agent.reasoner.task import Task
 from app.commom.prompt.model_service import TASK_DESCRIPTOR_PROMPT_TEMPLATE
-from app.commom.prompt.reasoner import (
-    ACTOR_PROMPT_TEMPLATE,
-    QUANTUM_THINKER_PROPMT_TEMPLATE,
-)
+from app.commom.prompt.reasoner import MONO_PROMPT_TEMPLATE
 from app.commom.system_env import SysEnvKey, SystemEnv
 from app.commom.type import MessageSourceType
 from app.memory.message import ModelMessage
@@ -18,7 +14,7 @@ from app.memory.reasoner_memory import BuiltinReasonerMemory, ReasonerMemory
 from app.toolkit.tool.tool import Tool
 
 
-class DualModelReasoner(Reasoner):
+class MonoModelReasoner(Reasoner):
     """Dual model reasoner.
 
     Attributes:
@@ -31,15 +27,10 @@ class DualModelReasoner(Reasoner):
 
     def __init__(
         self,
-        actor_name: str = MessageSourceType.ACTOR.value,
-        thinker_name: str = MessageSourceType.THINKER.value,
+        model_name: str = MessageSourceType.MODEL.value,
     ):
-        self._actor_name = actor_name
-        self._thinker_name = thinker_name
-        self._actor_model: ModelService = ModelServiceFactory.create(
-            platform_type=SystemEnv.platform_type(),
-        )
-        self._thinker_model: ModelService = ModelServiceFactory.create(
+        self._model_name = model_name
+        self._model: ModelService = ModelServiceFactory.create(
             platform_type=SystemEnv.platform_type(),
         )
 
@@ -55,21 +46,18 @@ class DualModelReasoner(Reasoner):
             str: The conclusion and the final resultes of the inference.
         """
         # prepare the variables from the SystemEnv
-        reasoning_rounds = int(SystemEnv.get(SysEnvKey.REASONING_ROUNDS))
         print_messages = (
             SystemEnv.get(SysEnvKey.PRINT_REASONER_MESSAGES).lower() == "true"
         )
 
         # set the system prompt
-        actor_sys_prompt = self._format_actor_sys_prompt(
-            task=task,
-            tools=task.tools,
-        )
-        thinker_sys_prompt = self._format_thinker_sys_prompt(task=task)
+        sys_prompt = self._format_system_prompt(task=task, tools=task.tools)
+        # logging
+        print(f"\033[38;5;245mSystem:\n{sys_prompt}\033[0m\n")
 
         # trigger the reasoning process
         init_message = ModelMessage(
-            source_type=MessageSourceType.ACTOR,
+            source_type=MessageSourceType.MODEL,
             content=(
                 "Scratchpad: Empty\n"
                 "Action: Empty\nFeedback: I need your help to complete the task\n"
@@ -81,48 +69,32 @@ class DualModelReasoner(Reasoner):
         reasoner_memory = self.init_memory(task=task)
         reasoner_memory.add_message(init_message)
 
-        for _ in range(reasoning_rounds):
-            # thinker
-            response = await self._thinker_model.generate(
-                sys_prompt=thinker_sys_prompt, messages=reasoner_memory.get_messages()
-            )
-            response.set_source_type(MessageSourceType.THINKER)
-            reasoner_memory.add_message(response)
+        response = await self._model.generate(
+            sys_prompt=sys_prompt,
+            messages=reasoner_memory.get_messages(),
+            tools=task.tools,
+        )
+        response.set_source_type(MessageSourceType.MODEL)
+        reasoner_memory.add_message(response)
 
-            # TODO: use standard logging instead of print
-            if print_messages:
-                print(f"\033[94mThinker:\n{response.get_payload()}\033[0m\n")
+        # TODO: use standard logging instead of print
+        if print_messages:
+            print(f"\033[92mActor:\n{response.get_payload()}\033[0m\n")
+            func_call_results = response.get_function_calls()
+            if func_call_results:
+                print(
+                    "\033[92m"
+                    + "\n".join([
+                        f"{i + 1}. {result.status} called function "
+                        f"{result.func_name}:\n"
+                        f"Call objective: {result.call_objective}\n"
+                        f"Function Output: {result.output}"
+                        for i, result in enumerate(func_call_results)
+                    ])
+                    + "\033[0m\n"
+                )
 
-            # actor
-            response = await self._actor_model.generate(
-                sys_prompt=actor_sys_prompt,
-                messages=reasoner_memory.get_messages(),
-                tools=task.tools,
-            )
-            response.set_source_type(MessageSourceType.ACTOR)
-            reasoner_memory.add_message(response)
-
-            # TODO: use standard logging instead of print
-            if print_messages:
-                print(f"\033[92mActor:\n{response.get_payload()}\033[0m\n")
-                func_call_results = response.get_function_calls()
-                if func_call_results:
-                    print(
-                        "\033[92m"
-                        + "\n".join([
-                            f"{i + 1}. {result.status} called function "
-                            f"{result.func_name}:\n"
-                            f"Call objective: {result.call_objective}\n"
-                            f"Function Output: {result.output}"
-                            for i, result in enumerate(func_call_results)
-                        ])
-                        + "\033[0m\n"
-                    )
-
-            if self.stop(response):
-                break
-
-        return await self.conclude(reasoner_memory=reasoner_memory)
+        return response.get_payload()
 
     async def update_knowledge(self, data: Any) -> None:
         """Update the knowledge."""
@@ -134,35 +106,14 @@ class DualModelReasoner(Reasoner):
 
     async def conclude(self, reasoner_memory: ReasonerMemory) -> str:
         """Conclude the inference results."""
+        return ""
 
-        content = reasoner_memory.get_message_by_index(-1).get_payload()
-
-        # find DELIVERABLE content
-        match = re.search(r"<DELIVERABLE>:\s*(.*)", content, re.DOTALL)
-
-        # If match found, process and return the content
-        if match:
-            deliverable_content = match.group(1)
-            return (
-                deliverable_content.replace("<Scratchpad>:", "")
-                .replace("<Action>:", "")
-                .replace("<Feedback>:", "")
-                .replace("TASK_DONE", "")
-            )
-        return (
-            content.replace("<Scratchpad>:", "")
-            .replace("<Action>:", "")
-            .replace("<Feedback>:", "")
-            .replace("TASK_DONE", "")
-        )
-
-    def _format_actor_sys_prompt(
+    def _format_system_prompt(
         self,
         task: Task,
         tools: Optional[List[Tool]] = None,
     ) -> str:
         """Set the system prompt."""
-        # set the task description
         task_description = (
             task.operator_config.instruction if task.operator_config else ""
         )
@@ -182,6 +133,7 @@ class DualModelReasoner(Reasoner):
         action_rels = "\n".join([
             f"[{action.name}: {action.description}] -next-> " for action in task.actions
         ])
+
         task_context = TASK_DESCRIPTOR_PROMPT_TEMPLATE.format(
             context=task.job.context,
             env_info=env_info,
@@ -190,12 +142,10 @@ class DualModelReasoner(Reasoner):
             scratchpad=scratchpad,
         )
 
-        # set the reasoning task
         reasoning_task = (
             f"=====\nTASK:\n{task_description}\nCONTEXT:\n{task_context}\n====="
         )
 
-        # set the function docstrings
         if tools:
             func_description = "\n".join([
                 f"Function: {tool.name}()\n{tool.description}\n" for tool in tools
@@ -213,57 +163,12 @@ class DualModelReasoner(Reasoner):
         else:
             output_schema = ""
 
-        # TODO: The prompt template comes from the <system-name>.config.yml, eg. chat2graph.config.yml
-        return ACTOR_PROMPT_TEMPLATE.format(
-            actor_name=self._actor_name,
-            thinker_name=self._thinker_name,
+        return MONO_PROMPT_TEMPLATE.format(
+            actor_name="AI Assistant",
+            thinker_name=self._model_name,
             task=reasoning_task,
             functions=func_description,
             output_schema=output_schema,
-        )
-
-    def _format_thinker_sys_prompt(
-        self,
-        task: Task,
-    ) -> str:
-        """Set the system prompt."""
-        # set the task description
-        task_description = (
-            task.operator_config.instruction if task.operator_config else ""
-        )
-        # set the task context
-        if task.insights:
-            env_info = "\n".join([f"{insight}" for insight in task.insights])
-        else:
-            env_info = "No environment information provided in this round."
-        if task.workflow_messages:
-            scratchpad = "\n".join([
-                f"{str(workflow_message.scratchpad)}"
-                for workflow_message in task.workflow_messages
-            ])
-        else:
-            scratchpad = "No scratchpad provided in this round."
-        action_rels = "\n".join([
-            f"[{action.name}: {action.description}] -next-> " for action in task.actions
-        ])
-        task_context = TASK_DESCRIPTOR_PROMPT_TEMPLATE.format(
-            context=task.job.context,
-            env_info=env_info,
-            knowledge=task.knowledge,
-            action_rels=action_rels,
-            scratchpad=scratchpad,
-        )
-
-        # set the reasoning task
-        reasoning_task = (
-            f"=====\nTASK:\n{task_description}\nCONTEXT:\n{task_context}\n====="
-        )
-
-        # TODO: The prompt template comes from the <system-name>.config.yml, eg. chat2graph.config.yml
-        return QUANTUM_THINKER_PROPMT_TEMPLATE.format(
-            actor_name=self._actor_name,
-            thinker_name=self._thinker_name,
-            task=reasoning_task,
         )
 
     def init_memory(self, task: Task) -> ReasonerMemory:
@@ -295,8 +200,3 @@ class DualModelReasoner(Reasoner):
             return self._memories[session_id][job_id][operator_id]
         except (KeyError, AssertionError, AttributeError):
             return self.init_memory(task=task)
-
-    @staticmethod
-    def stop(message: ModelMessage) -> bool:
-        """Stop the reasoner."""
-        return "TASK_DONE" in message.get_payload()

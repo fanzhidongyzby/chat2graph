@@ -7,9 +7,9 @@ class Job:
     """Job is the dataclass assigned to the leader or the experts.
 
     Attributes:
+        id (str): The unique identifier of the task.
         session_id (str): The unique identifier of the session.
         goal (str): The goal of the task.
-        id (str): The unique identifier of the task.
         context (str): The context of the task.
         output_schema (str): The output schema of the task.
     """
