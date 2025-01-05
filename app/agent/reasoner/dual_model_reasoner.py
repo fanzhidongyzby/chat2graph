@@ -11,7 +11,7 @@ from app.commom.prompt.reasoner import (
     ACTOR_PROMPT_TEMPLATE,
     QUANTUM_THINKER_PROPMT_TEMPLATE,
 )
-from app.commom.system_env import SysEnvKey, SystemEnv
+from app.commom.system_env import SystemEnv
 from app.commom.type import MessageSourceType
 from app.memory.message import ModelMessage
 from app.memory.reasoner_memory import BuiltinReasonerMemory, ReasonerMemory
@@ -37,10 +37,10 @@ class DualModelReasoner(Reasoner):
         self._actor_name = actor_name
         self._thinker_name = thinker_name
         self._actor_model: ModelService = ModelServiceFactory.create(
-            platform_type=SystemEnv.platform_type(),
+            platform_type=SystemEnv.PLATFORM_TYPE
         )
         self._thinker_model: ModelService = ModelServiceFactory.create(
-            platform_type=SystemEnv.platform_type(),
+            platform_type=SystemEnv.PLATFORM_TYPE
         )
 
         self._memories: Dict[str, Dict[str, Dict[str, ReasonerMemory]]] = {}
@@ -55,10 +55,8 @@ class DualModelReasoner(Reasoner):
             str: The conclusion and the final resultes of the inference.
         """
         # prepare the variables from the SystemEnv
-        reasoning_rounds = int(SystemEnv.get(SysEnvKey.REASONING_ROUNDS))
-        print_messages = (
-            SystemEnv.get(SysEnvKey.PRINT_REASONER_MESSAGES).lower() == "true"
-        )
+        reasoning_rounds = SystemEnv.REASONING_ROUNDS
+        print_messages = SystemEnv.PRINT_REASONER_MESSAGE
 
         # set the system prompt
         actor_sys_prompt = self._format_actor_sys_prompt(
@@ -66,13 +64,15 @@ class DualModelReasoner(Reasoner):
             tools=task.tools,
         )
         thinker_sys_prompt = self._format_thinker_sys_prompt(task=task)
+        print(f"\033[38;5;245mSystem:\n{actor_sys_prompt}\033[0m\n")
 
         # trigger the reasoning process
         init_message = ModelMessage(
             source_type=MessageSourceType.ACTOR,
             content=(
-                "Scratchpad: Empty\n"
-                "Action: Empty\nFeedback: I need your help to complete the task\n"
+                "<scratchpad>\nEmpty\n</scratchpad>\n"
+                "<action>\nEmpty\n</action>\n"
+                "<feedback>\nNo feadback\n</feedback>\n"
             ),
             timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
@@ -108,7 +108,7 @@ class DualModelReasoner(Reasoner):
                 func_call_results = response.get_function_calls()
                 if func_call_results:
                     print(
-                        "\033[92m"
+                        "\033[92m<function_call_result>\n"
                         + "\n".join([
                             f"{i + 1}. {result.status} called function "
                             f"{result.func_name}:\n"
@@ -116,7 +116,7 @@ class DualModelReasoner(Reasoner):
                             f"Function Output: {result.output}"
                             for i, result in enumerate(func_call_results)
                         ])
-                        + "\033[0m\n"
+                        + "\n</function_call_result>\033[0m\n"
                     )
 
             if self.stop(response):
@@ -138,21 +138,31 @@ class DualModelReasoner(Reasoner):
         content = reasoner_memory.get_message_by_index(-1).get_payload()
 
         # find DELIVERABLE content
-        match = re.search(r"<DELIVERABLE>:\s*(.*)", content, re.DOTALL)
+        match = re.search(r"<DELIVERABLE>\s*(.*?)\s*</DELIVERABLE>", content, re.DOTALL)
 
         # If match found, process and return the content
         if match:
             deliverable_content = match.group(1)
+            print(f"\033[38;5;245mReasoner:\n{deliverable_content}\033[0m\n")
+
             return (
-                deliverable_content.replace("<Scratchpad>:", "")
-                .replace("<Action>:", "")
-                .replace("<Feedback>:", "")
+                deliverable_content.replace("<scratchpad>", "")
+                .replace("</scratchpad>", "")
+                .replace("<action>", "")
+                .replace("</action>", "")
+                .replace("<feedback>", "")
+                .replace("</feedback>", "")
+                .replace("</DELIVERABLE>", "")
                 .replace("TASK_DONE", "")
             )
         return (
-            content.replace("<Scratchpad>:", "")
-            .replace("<Action>:", "")
-            .replace("<Feedback>:", "")
+            content.replace("<scratchpad>", "")
+            .replace("</scratchpad>", "")
+            .replace("<action>", "")
+            .replace("</action>", "")
+            .replace("<feedback>", "")
+            .replace("</feedback>", "")
+            .replace("</DELIVERABLE>", "")
             .replace("TASK_DONE", "")
         )
 
@@ -207,7 +217,7 @@ class DualModelReasoner(Reasoner):
             output_schema = "\n".join([
                 "\t    " + schema
                 for schema in (
-                    f"[Follow the final delivery example:]\n{task.operator_config.output_schema}"
+                    f"[Follow the final delivery example:]\n{task.operator_config.output_schema.strip()}"
                 ).split("\n")
             ])
         else:
@@ -299,4 +309,8 @@ class DualModelReasoner(Reasoner):
     @staticmethod
     def stop(message: ModelMessage) -> bool:
         """Stop the reasoner."""
-        return "TASK_DONE" in message.get_payload()
+        # TODO: fix the stop condition
+        return (
+            "TASK_DONE" in message.get_payload()
+            or "DELIVERABLE" in message.get_payload()
+        )

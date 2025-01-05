@@ -1,102 +1,61 @@
 import os
-import threading
-from contextvars import ContextVar
-from enum import Enum, unique
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Tuple, Type
 
 from dotenv import load_dotenv
 
 from app.commom.type import PlatformType
 
-_context_cache: ContextVar[Dict[str, Any]] = ContextVar("env_cache", default={})
+# system environment variable keys
+_env_vars: Dict[str, Tuple[Type, Any]] = {
+    "PLATFORM_TYPE": (PlatformType, PlatformType.DBGPT),
+    "PROXYLLM_BACKEND": (str, "gpt-4o-mini"),
+    "PROXY_SERVER_URL": (str, None),
+    "PROXY_API_KEY": (str, None),
+    "TEMPERATURE": (float, 0.7),
+    "REASONING_ROUNDS": (int, 20),
+    "PRINT_REASONER_MESSAGES": (bool, True),
+}
+
+# system environment variable value cache.
+_env_values: Dict[str, Any] = {}
 
 
-@unique
-class SysEnvKey(str, Enum):
-    """System environment variable keys.
-
-    Attributes:
-        PLATFORM_TYPE: The type of platform
-        PROXYLLM_BACKEND: The backend of ProxLLM
-        PROXY_SERVER_URL: The URL of the proxy server
-        PROXY_API_KEY: The API key of the proxy server
-        REASONING_ROUNDS: The rounds of reasoning in the reasoner
-    """
-
-    PLATFORM_TYPE = "PLATFORM_TYPE"
-    PROXYLLM_BACKEND = "PROXYLLM_BACKEND"
-    PROXY_SERVER_URL = "PROXY_SERVER_URL"
-    PROXY_API_KEY = "PROXY_API_KEY"
-    REASONING_ROUNDS = "REASONING_ROUNDS"
-    PRINT_REASONER_MESSAGES = "PRINT_REASONER_MESSAGES"
-
-    def get_default(self) -> Optional[str]:
-        """Get default value for the key."""
-        defaults = {
-            self.PLATFORM_TYPE: PlatformType.DBGPT.name,
-            self.PROXYLLM_BACKEND: "gpt-4o-mini",
-            self.PROXY_SERVER_URL: None,
-            self.PROXY_API_KEY: None,
-            self.REASONING_ROUNDS: "20",
-            self.PRINT_REASONER_MESSAGES: "True",
-        }
-        return defaults.get(self)
-
-
-class SystemEnv:
+class SystemEnvMeta(type):
     """Singleton class to manage system environment variables"""
 
-    _instance = None
-    _initialized = False
-    _lock = threading.Lock()
+    def __init__(cls, name: str, bases: Tuple, dct: Dict):
+        super().__init__(name, bases, dct)
+        env_path = Path(".env")
+        if env_path.exists():
+            load_dotenv(env_path, override=True)
 
-    def __new__(cls) -> "SystemEnv":
-        with cls._lock:
-            if cls._instance is None:
-                cls._instance = super().__new__(cls)
-                cls._instance._load_env()
-        return cls._instance
+    def __getattr__(cls, name: str) -> Any:
+        """Get value following priority: .env > os env > default value"""
+        key = name.upper()
 
-    @classmethod
-    def _load_env(cls):
-        """Load .env file once at initialization
+        # get value from .env
+        val = _env_values.get(key, None)
+        if val:
+            return val
 
-        Store values in _env_cache for priority handling
-        """
-        if not cls._initialized:
-            env_path = Path(".env")
-            if env_path.exists():
-                load_dotenv(env_path)
-            cls._initialized = True
+        # get value from system env
+        val = os.getenv(key, None)
 
-    @staticmethod
-    def get(key: str, default_value: Optional[str] = None) -> str:
-        """Get value following priority: context cache > .env > os env > default value"""
-        context_cache = _context_cache.get()
-        if key in context_cache:
-            return context_cache[key]
+        # get key declaration
+        (key_type, default_value) = _env_vars.get(key, (None, None))
+        if not key_type:
+            _env_values[key] = val
+            return val
 
-        env_value = os.getenv(key)
-        if env_value:
-            return env_value
+        # use default value
+        val = val if val else default_value
 
-        if not default_value:
-            # try to get default from SysEnvKey if it exists
-            try:
-                sys_key = SysEnvKey(key)
-                key_default = sys_key.get_default()
-                if key_default is not None:
-                    return key_default
-                else:
-                    return ""
-            except ValueError:
-                return ""  # Key is not in SysEnvKey enum
+        # cast value by type
+        val = key_type(val) if val else None
+        _env_values[key] = val
+        return val
 
-        return default_value
 
-    @staticmethod
-    def platform_type() -> PlatformType:
-        """Get platform type with caching and enum conversion"""
-        platform_name = SystemEnv.get(SysEnvKey.PLATFORM_TYPE)
-        return PlatformType[platform_name]
+class SystemEnv(metaclass=SystemEnvMeta):
+    """Static class to manage system environment variables"""

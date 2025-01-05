@@ -14,7 +14,7 @@ class SyncAdd(Tool):
 
     def __init__(self, id: Optional[str] = None):
         name = self.sync_add.__name__
-        description = self.sync_add.__doc__
+        description = self.sync_add.__doc__ or ""
         super().__init__(
             name=name,
             description=description,
@@ -37,7 +37,7 @@ class AsyncMultiply(Tool):
 
     def __init__(self, id: Optional[str] = None):
         name = self.async_multiply.__name__
-        description = self.async_multiply.__doc__
+        description = self.async_multiply.__doc__ or ""
         super().__init__(
             name=name,
             description=description,
@@ -59,7 +59,7 @@ class AsyncMultiply(Tool):
 class ProcessComplexData(Tool):
     def __init__(self, id: Optional[str] = None):
         name = self.process_complex_data.__name__
-        description = self.process_complex_data.__doc__
+        description = self.process_complex_data.__doc__ or ""
         super().__init__(
             name=name,
             description=description,
@@ -93,7 +93,10 @@ class TestModelService(ModelService):
     """Test implementation of ModelService."""
 
     async def generate(
-        self, system_prompt: str, messages: List[ModelMessage]
+        self,
+        system_prompt: str,
+        messages: List[ModelMessage],
+        tools: Optional[List[Tool]] = None,
     ) -> ModelMessage:
         """Implement abstract method."""
         return ModelMessage(
@@ -164,9 +167,9 @@ async def main():
             tools=test_tools, model_response_text=test_msg.get_payload()
         )
         if func_call_results:
-            for j, result in enumerate(func_call_results, 1):
+            for j, result in enumerate(func_call_results):
                 print(
-                    f"{j}. {result.status} called function {result.func_name}:\n"
+                    f"{j + 1}. {result.status} called function {result.func_name}:\n"
                     f"Call objective: {result.call_objective}\n"
                     f"Function Output: {result.output}"
                 )

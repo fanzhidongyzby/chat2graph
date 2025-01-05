@@ -17,7 +17,7 @@ from dbgpt.model.proxy.llms.chatgpt import OpenAILLMClient  # type: ignore
 
 from app.agent.reasoner.model_service import ModelService
 from app.commom.prompt.model_service import FUNC_CALLING_PROMPT
-from app.commom.system_env import SysEnvKey, SystemEnv
+from app.commom.system_env import SystemEnv
 from app.commom.type import MessageSourceType
 from app.memory.message import ModelMessage
 from app.toolkit.tool.tool import FunctionCallResult, Tool
@@ -33,11 +33,13 @@ class DbgptLlmClient(ModelService):
     def __init__(self):
         super().__init__()
         # use openai llm client by default
-        # TODO: Support other llm clients
+        # TODO: support other llm clients
+        # TODO: support more llm client configurations
         self._llm_client: LLMClient = OpenAILLMClient(
-            model_alias=SystemEnv.get(SysEnvKey.PROXYLLM_BACKEND),
-            api_base=SystemEnv.get(SysEnvKey.PROXY_SERVER_URL),
-            api_key=SystemEnv.get(SysEnvKey.PROXY_API_KEY),
+            model_alias=SystemEnv.PROXYLLM_BACKEND,
+            api_base=SystemEnv.PROXY_SERVER_URL,
+            api_key=SystemEnv.PROXY_API_KEY,
+            openai_kwargs={"temperature": SystemEnv.TEMPERATURE},
         )
 
     async def generate(
@@ -94,13 +96,17 @@ class DbgptLlmClient(ModelService):
             base_message_content = message.get_payload()
             func_call_results = message.get_function_calls()
             if func_call_results:
-                for result in func_call_results:
-                    base_message_content += (
-                        f"\n{result.status} called function "
+                base_message_content += (
+                    "<function_call_result>\n"
+                    + "\n".join([
+                        f"{i + 1}. {result.status} called function "
                         f"{result.func_name}:\n"
                         f"Call objective: {result.call_objective}\n"
                         f"Function Output: {result.output}"
-                    )
+                        for i, result in enumerate(func_call_results)
+                    ])
+                    + "\n</function_call_result>"
+                )
 
             # Chat2Graph <-> DB-GPT msg: actor <-> ai & thinker <-> human
             if message.get_source_type() == MessageSourceType.ACTOR:
@@ -110,7 +116,7 @@ class DbgptLlmClient(ModelService):
 
         model_messages = DbgptModelMessage.from_base_messages(base_messages)
         model_request = ModelRequest.build_request(
-            model=SystemEnv.get(SysEnvKey.PROXYLLM_BACKEND),
+            model=SystemEnv.PROXYLLM_BACKEND,
             messages=model_messages,
         )
 
