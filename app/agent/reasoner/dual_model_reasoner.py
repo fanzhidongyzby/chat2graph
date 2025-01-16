@@ -56,7 +56,7 @@ class DualModelReasoner(Reasoner):
         """
         # prepare the variables from the SystemEnv
         reasoning_rounds = SystemEnv.REASONING_ROUNDS
-        print_messages = SystemEnv.PRINT_REASONER_MESSAGE
+        print_messages = SystemEnv.PRINT_REASONER_MESSAGES
 
         # set the system prompt
         actor_sys_prompt = self._format_actor_sys_prompt(
@@ -109,13 +109,15 @@ class DualModelReasoner(Reasoner):
                 if func_call_results:
                     print(
                         "\033[92m<function_call_result>\n"
-                        + "\n".join([
-                            f"{i + 1}. {result.status} called function "
-                            f"{result.func_name}:\n"
-                            f"Call objective: {result.call_objective}\n"
-                            f"Function Output: {result.output}"
-                            for i, result in enumerate(func_call_results)
-                        ])
+                        + "\n".join(
+                            [
+                                f"{i + 1}. {result.status} called function "
+                                f"{result.func_name}:\n"
+                                f"Call objective: {result.call_objective}\n"
+                                f"Function Output: {result.output}"
+                                for i, result in enumerate(func_call_results)
+                            ]
+                        )
                         + "\n</function_call_result>\033[0m\n"
                     )
 
@@ -173,9 +175,7 @@ class DualModelReasoner(Reasoner):
     ) -> str:
         """Set the system prompt."""
         # set the task description
-        task_description = (
-            task.operator_config.instruction if task.operator_config else ""
-        )
+        task_description = task.operator_config.instruction if task.operator_config else ""
 
         # set the task context
         if task.insights:
@@ -183,15 +183,14 @@ class DualModelReasoner(Reasoner):
         else:
             env_info = "No environment information provided in this round."
         if task.workflow_messages:
-            scratchpad = "\n".join([
-                f"{workflow_message.scratchpad}"
-                for workflow_message in task.workflow_messages
-            ])
+            scratchpad = "\n".join(
+                [f"{workflow_message.scratchpad}" for workflow_message in task.workflow_messages]
+            )
         else:
             scratchpad = "No scratchpad provided in this round."
-        action_rels = "\n".join([
-            f"[{action.name}: {action.description}] -next-> " for action in task.actions
-        ])
+        action_rels = "\n".join(
+            [f"[{action.name}: {action.description}] -next-> " for action in task.actions]
+        )
         task_context = TASK_DESCRIPTOR_PROMPT_TEMPLATE.format(
             context=task.job.context,
             env_info=env_info,
@@ -201,25 +200,25 @@ class DualModelReasoner(Reasoner):
         )
 
         # set the reasoning task
-        reasoning_task = (
-            f"=====\nTASK:\n{task_description}\nCONTEXT:\n{task_context}\n====="
-        )
+        reasoning_task = f"=====\nTASK:\n{task_description}\nCONTEXT:\n{task_context}\n====="
 
         # set the function docstrings
         if tools:
-            func_description = "\n".join([
-                f"Function: {tool.name}()\n{tool.description}\n" for tool in tools
-            ])
+            func_description = "\n".join(
+                [f"Function: {tool.name}()\n{tool.description}\n" for tool in tools]
+            )
         else:
             func_description = "No function calling in this round."
 
         if task.operator_config and task.operator_config.output_schema:
-            output_schema = "\n".join([
-                "\t    " + schema
-                for schema in (
-                    f"[Follow the final delivery example:]\n{task.operator_config.output_schema.strip()}"
-                ).split("\n")
-            ])
+            output_schema = "\n".join(
+                [
+                    "\t    " + schema
+                    for schema in (
+                        f"[Follow the final delivery example:]\n{task.operator_config.output_schema.strip()}"
+                    ).split("\n")
+                ]
+            )
         else:
             output_schema = ""
 
@@ -238,24 +237,24 @@ class DualModelReasoner(Reasoner):
     ) -> str:
         """Set the system prompt."""
         # set the task description
-        task_description = (
-            task.operator_config.instruction if task.operator_config else ""
-        )
+        task_description = task.operator_config.instruction if task.operator_config else ""
         # set the task context
         if task.insights:
             env_info = "\n".join([f"{insight}" for insight in task.insights])
         else:
             env_info = "No environment information provided in this round."
         if task.workflow_messages:
-            scratchpad = "\n".join([
-                f"{str(workflow_message.scratchpad)}"
-                for workflow_message in task.workflow_messages
-            ])
+            scratchpad = "\n".join(
+                [
+                    f"{str(workflow_message.scratchpad)}"
+                    for workflow_message in task.workflow_messages
+                ]
+            )
         else:
             scratchpad = "No scratchpad provided in this round."
-        action_rels = "\n".join([
-            f"[{action.name}: {action.description}] -next-> " for action in task.actions
-        ])
+        action_rels = "\n".join(
+            [f"[{action.name}: {action.description}] -next-> " for action in task.actions]
+        )
         task_context = TASK_DESCRIPTOR_PROMPT_TEMPLATE.format(
             context=task.job.context,
             env_info=env_info,
@@ -265,9 +264,7 @@ class DualModelReasoner(Reasoner):
         )
 
         # set the reasoning task
-        reasoning_task = (
-            f"=====\nTASK:\n{task_description}\nCONTEXT:\n{task_context}\n====="
-        )
+        reasoning_task = f"=====\nTASK:\n{task_description}\nCONTEXT:\n{task_context}\n====="
 
         # TODO: The prompt template comes from the <system-name>.config.yml, eg. chat2graph.config.yml
         return QUANTUM_THINKER_PROPMT_TEMPLATE.format(
@@ -310,7 +307,4 @@ class DualModelReasoner(Reasoner):
     def stop(message: ModelMessage) -> bool:
         """Stop the reasoner."""
         # TODO: fix the stop condition
-        return (
-            "TASK_DONE" in message.get_payload()
-            or "DELIVERABLE" in message.get_payload()
-        )
+        return "TASK_DONE" in message.get_payload() and "DELIVERABLE" in message.get_payload()
