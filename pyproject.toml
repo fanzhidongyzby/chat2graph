@@ -30,10 +30,14 @@ pytest = "*"
 ruff = "*"
 mypy = "*"
 
+[tool.poetry.group.service.dependencies]
+flask = "3.1.0"
+flask-sqlalchemy = "3.1.1"
+flask-cors = "5.0.0"
+
 [tool.poetry.group.test.dependencies]
 pytest = "*"
 pytest-cov = "*"
-
 
 [tool.poetry.group.db-gpt.dependencies]
 dbgpt = { version = "0.6.3", extras = ["framework", "rag"] }
