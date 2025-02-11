@@ -1,9 +1,9 @@
-import asyncio
 from typing import List, Optional, Tuple
 from uuid import uuid4
 
-from app.agent.job import Job
+from app.agent.agent import AgentConfig, Profile
 from app.agent.reasoner.dual_model_reasoner import DualModelReasoner
+from app.agent.reasoner.reasoner import Reasoner
 from app.agent.workflow.operator.operator import Operator, OperatorConfig
 from app.plugin.dbgpt.dbgpt_workflow import DbgptWorkflow
 from app.toolkit.action.action import Action
@@ -169,7 +169,7 @@ TuGraph支持多种可用于属性的数据类型。具体支持的数据类型�
 | LINESTRING   |                     |                     | EWKB格式数据，表示线              |
 | POLYGON      |                     |                     | EWKB格式数据，表示面(多边形)       |
 | FLOAT_VECTOR |                     |                     | 包含32位浮点数的动态向量               |
-""",
+""",  # noqa: E501
 ]
 
 TUGRAPH_REF = ["TuGraph-Cpyher语法书", "TuGraph图模型说明-数据类型"]
@@ -190,14 +190,7 @@ Neo4j是一款流行的图数据库，它使用Cypher查询语言来操作和查
 根据您的需求选择合适的解决方案后，重新运行查询并检查是否成功显示完整的结果。如果结果仍然不完整，请确保您已正确设置驱动程序的配置选项或正确实现分页查询。如果您选择将结果导出到文件，请确保文件中包含完整的结果。
 当在Python中使用Neo4j图数据库执行Cypher查询时，有时会遇到结果不完整显示的问题。这是由于默认限制或结果截断导致的。通过增加限制、使用分页查询或将结果导出到文件，我们可以解决这个问题，并获得完整的Cypher查询结果。根据具体需求，请选择适合您的解决方案，以便在Python中正常查看和处理Neo4j查询结果。
 分享快讯到朋友圈
-None
-None
-扫码关注腾讯云开发者
-领取腾讯云代金券
-None
-None
-None
-""",
+"""  # noqa: E501
 ]
 
 INTERNET_REF = [
@@ -217,7 +210,8 @@ class KnowledgeBaseRetriever(Tool):
         )
 
     async def knowledge_base_search(self, question: str) -> Tuple[List[str], List[str]]:
-        """Retrive a list of related contents and a list of their reference name from knowledge base given the question.
+        """Retrive a list of related contents and a list of their reference name from knowledge
+        base given the question.
 
         Args:
             question (str): The question asked by user.
@@ -241,13 +235,15 @@ class InternetRetriever(Tool):
         )
 
     async def internet_search(self, question: str) -> Tuple[List[str], List[str]]:
-        """Retrive a list of related webpage contents and a list of their URL references from Internet given the question.
+        """Retrive a list of related webpage contents and a list of their URL references from
+        Internet given the question.
 
         Args:
             question (str): The question asked by user.
 
         Returns:
-            Tuple[List[str], List[str]]: The list of related webpage contents and the list of URL references.
+            Tuple[List[str], List[str]]: The list of related webpage contents and the list of URL
+            references.
         """
 
         return INTERNET_DOC, INTERNET_REF
@@ -387,40 +383,13 @@ def get_question_answering_workflow():
     return workflow
 
 
-QUESTION = """
-我在执行Cypher语句
-CALL db.createVertexLabelByJson('{
-    "label": "州",
-    "primary": "state",
-    "type": "VERTEX",
-    "properties": [
-        {
-            "name": "state",
-            "type": "INT12"
-        }
-    ]
-}');
-的时候，遇到报错：执行失败 unknown keyword str: [INT12]，
-请问原因是什么，该如何修改？
-"""
+def get_graph_question_answeing_expert_config(reasoner: Optional[Reasoner] = None) -> AgentConfig:
+    """Get the expert configuration for graph Q&A."""
 
-
-async def main():
-    """Main function"""
-    workflow = get_question_answering_workflow()
-
-    job = Job(
-        id="test_job_id",
-        session_id="test_session_id",
-        goal="「任务」",
-        context=QUESTION,
+    expert_config = AgentConfig(
+        profile=Profile(name="Graph Q&A Expert", description=DOC_SUMMARIZING_PROFILE),
+        reasoner=reasoner or DualModelReasoner(),
+        workflow=get_question_answering_workflow(),
     )
-    reasoner = DualModelReasoner()
 
-    result = await workflow.execute(job=job, reasoner=reasoner)
-
-    print(f"Final result:\n{result.scratchpad}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    return expert_config

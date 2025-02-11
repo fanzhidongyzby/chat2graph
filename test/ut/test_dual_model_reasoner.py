@@ -1,10 +1,10 @@
 import time
-from typing import List, Optional
+from typing import List
 from unittest.mock import AsyncMock
 
 import pytest
 
-from app.agent.job import Job
+from app.agent.job import SubJob
 from app.agent.reasoner.dual_model_reasoner import DualModelReasoner
 from app.agent.reasoner.task import Task
 from app.agent.workflow.operator.operator_config import OperatorConfig
@@ -20,12 +20,12 @@ async def mock_reasoner() -> DualModelReasoner:
 
     actor_response = ModelMessage(
         source_type=MessageSourceType.ACTOR,
-        content="<scratchpad>\nTesting\n</scratchpad>\n<action>\nProceed\n</action>\n<feedback>\nSuccess\n</feedback>",
+        payload="<scratchpad>\nTesting\n</scratchpad>\n<action>\nProceed\n</action>\n<feedback>\nSuccess\n</feedback>",
         timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
     thinker_response = ModelMessage(
         source_type=MessageSourceType.THINKER,
-        content="<instruction>\nTest instruction\n</instruction>\n<input>\nTest input\n</input>",
+        payload="<instruction>\nTest instruction\n</instruction>\n<input>\nTest input\n</input>",
         timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
 
@@ -38,7 +38,7 @@ async def mock_reasoner() -> DualModelReasoner:
 @pytest.fixture
 def task():
     """Create a test Task for testing."""
-    job = Job(session_id="test_session_id", goal="Test goal")
+    job = SubJob(session_id="test_session_id", goal="Test goal")
     config = OperatorConfig(instruction="Test instruction", actions=[])
     return Task(job=job, operator_config=config)
 
@@ -71,7 +71,7 @@ async def test_infer_early_stop(mock_reasoner: DualModelReasoner, task: Task):
     # modify actor response to trigger stop condition
     stop_response = ModelMessage(
         source_type=MessageSourceType.ACTOR,
-        content="<scratchpad>\nDone\n</scratchpad>\n<action>\nStop\n</action>\n<feedback>\nTASK_DONE\n</feedback>",
+        payload="<scratchpad>\nDone\n</scratchpad>\n<action>\nStop\n</action>\n<feedback>\n<DELIVERABLE></DELIVERABLE>\n</feedback>",
         timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
     mock_reasoner._thinker_model.generate = AsyncMock(return_value=stop_response)
@@ -92,7 +92,7 @@ async def test_infer_multiple_rounds(mock_reasoner: DualModelReasoner, task: Tas
     async def generate_with_rounds(
         sys_prompt: str,
         messages: List[ModelMessage],
-        tools: Optional[List[Tool]] = None,
+        tools: List[Tool] | None = None,
     ) -> ModelMessage:
         nonlocal round_count
         round_count += 1
@@ -100,7 +100,7 @@ async def test_infer_multiple_rounds(mock_reasoner: DualModelReasoner, task: Tas
             source_type=MessageSourceType.ACTOR
             if round_count % 2 == 0
             else MessageSourceType.THINKER,
-            content=f"Round {round_count} content",
+            payload=f"Round {round_count} content",
             timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
 

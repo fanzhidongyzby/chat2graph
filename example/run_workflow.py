@@ -2,7 +2,7 @@ import asyncio
 import time
 from typing import Any, List, Optional
 
-from app.agent.job import Job
+from app.agent.job import Job, SubJob
 from app.agent.reasoner.reasoner import Reasoner
 from app.agent.reasoner.task import Task
 from app.agent.workflow.operator.operator import Operator
@@ -60,6 +60,7 @@ class BaseTestOperator(Operator):
         reasoner: Reasoner,
         job: Job,
         workflow_messages: Optional[List[WorkflowMessage]] = None,
+        lesson: Optional[str] = None,
     ) -> WorkflowMessage:
         raise NotImplementedError
 
@@ -75,6 +76,7 @@ class UpperOperator(BaseTestOperator):
         reasoner: Reasoner,
         job: Job,
         workflow_messages: Optional[List[WorkflowMessage]] = None,
+        lesson: Optional[str] = None,
     ) -> WorkflowMessage:
         scratchpad_content = ""
         if workflow_messages:
@@ -84,7 +86,7 @@ class UpperOperator(BaseTestOperator):
         result = job.context.upper() + scratchpad_content.upper()
         print(f"UpperOperator input - context: {job.context}, scratchpad: {scratchpad_content}")
         print(f"UpperOperator output: {result}\n\n")
-        return WorkflowMessage(content={"scratchpad": result})
+        return WorkflowMessage(payload={"scratchpad": result})
 
 
 class AddPrefixOperator(BaseTestOperator):
@@ -98,6 +100,7 @@ class AddPrefixOperator(BaseTestOperator):
         reasoner: Reasoner,
         job: Job,
         workflow_messages: Optional[List[WorkflowMessage]] = None,
+        lesson: Optional[str] = None,
     ) -> WorkflowMessage:
         # to avoid the async issue of UpperOperator
         time.sleep(1)
@@ -110,7 +113,7 @@ class AddPrefixOperator(BaseTestOperator):
         result = f"Prefix_{scratchpad_content}{job.context}"
         print(f"AddPrefixOperator input - context: {job.context}, scratchpad: {scratchpad_content}")
         print(f"AddPrefixOperator output: {result}\n\n")
-        return WorkflowMessage(content={"scratchpad": result})
+        return WorkflowMessage(payload={"scratchpad": result})
 
 
 class AddSuffixOperator(BaseTestOperator):
@@ -124,6 +127,7 @@ class AddSuffixOperator(BaseTestOperator):
         reasoner: Reasoner,
         job: Job,
         workflow_messages: Optional[List[WorkflowMessage]] = None,
+        lesson: Optional[str] = None,
     ) -> WorkflowMessage:
         scratchpad_content = ""
         if workflow_messages:
@@ -133,7 +137,7 @@ class AddSuffixOperator(BaseTestOperator):
         result = f"{scratchpad_content}_Suffix"
         print(f"AddSuffixOperator input - context: {job.context}, scratchpad: {scratchpad_content}")
         print(f"AddSuffixOperator output: {result}\n\n")
-        return WorkflowMessage(content={"scratchpad": result})
+        return WorkflowMessage(payload={"scratchpad": result})
 
 
 class EvalOperator(BaseTestOperator):
@@ -147,6 +151,7 @@ class EvalOperator(BaseTestOperator):
         reasoner: Reasoner,
         job: Job,
         workflow_messages: Optional[List[WorkflowMessage]] = None,
+        lesson: Optional[str] = None,
     ) -> WorkflowMessage:
         scratchpad_content = ""
         if workflow_messages:
@@ -160,7 +165,7 @@ class EvalOperator(BaseTestOperator):
         print(f"EvalOperator input - context: {job.context}, scratchpad: {scratchpad_content}")
         print(f"EvalOperator output: {result}\n\n")
         return WorkflowMessage(
-            content={
+            payload={
                 "scratchpad": result,
                 "status": "success",
                 "experience": "The workflow is executed successfully",
@@ -170,7 +175,7 @@ class EvalOperator(BaseTestOperator):
 
 async def main():
     """Test parallel workflow: Upper -> Join <- Prefix"""
-    job = Job(
+    job = SubJob(
         id="test_job_id",
         session_id="test_session_id",
         goal="Test goal",

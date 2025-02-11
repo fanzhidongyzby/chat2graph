@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 
 import pytest
 
-from app.agent.job import Job
+from app.agent.job import Job, SubJob
 from app.agent.reasoner.reasoner import Reasoner
 from app.agent.reasoner.task import Task
 from app.agent.workflow.operator.operator import Operator
@@ -42,7 +42,7 @@ class TestReasoner(Reasoner):
 @pytest.fixture
 def job():
     """Create a test job."""
-    return Job(
+    return SubJob(
         id="test_job_id",
         session_id="test_session_id",
         goal="Test goal",
@@ -67,10 +67,11 @@ class MockOperator(Operator):
         self,
         reasoner: Reasoner,
         job: Job,
-        workflow_messages: List[WorkflowMessage] = None,
+        workflow_messages: Optional[List[WorkflowMessage]] = None,
+        lesson: Optional[str] = None,
     ) -> WorkflowMessage:
         self._execution_order.append(self._config.id)
-        return WorkflowMessage(content={"scratchpad": f"Output from {self._config.id}"})
+        return WorkflowMessage(payload={"scratchpad": f"Output from {self._config.id}"})
 
 
 @pytest.mark.asyncio
@@ -128,7 +129,13 @@ async def test_workflow_error_handling(job: Job, mock_reasoner: Reasoner):
     class ErrorOperator(MockOperator):
         """Operator that raises an error during execution."""
 
-        async def execute(self, reasoner, job, workflow_messages=None):
+        async def execute(
+            self,
+            reasoner: Reasoner,
+            job: Job,
+            workflow_messages: Optional[List[WorkflowMessage]] = None,
+            lesson: Optional[str] = None,
+        ) -> WorkflowMessage:
             raise ValueError("Test error")
 
     # create workflow with error operator
