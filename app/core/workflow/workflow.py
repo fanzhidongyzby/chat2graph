@@ -91,7 +91,9 @@ class Workflow(ABC):
 
     def set_evaluator(self, evaluator: EvalOperator):
         """Add an evaluator operator to the workflow."""
-        self._evaluator = evaluator
+        with self.__lock:
+            self._evaluator = evaluator
+            self.__workflow = None
 
     def get_operator(self, operator_id: str) -> Optional[Operator]:
         """Get an operator from the workflow."""
@@ -103,6 +105,15 @@ class Workflow(ABC):
     def get_operators(self) -> List[Operator]:
         """Get all operators from the workflow."""
         return [data["operator"] for _, data in self._operator_graph.nodes() if "operator" in data]
+
+    def update_operator(self, operator: Operator) -> None:
+        """Update an operator in the workflow."""
+        with self.__lock:
+            id = operator.get_id()
+            if not self._operator_graph.has_node(id):
+                raise ValueError(f"Operator {id} does not exist in the workflow.")
+            self._operator_graph.nodes[id]["operator"] = operator
+            self.__workflow = None
 
     def visualize(self) -> None:
         """Visualize the workflow."""
@@ -121,3 +132,26 @@ class Workflow(ABC):
         lesson: Optional[str] = None,
     ) -> WorkflowMessage:
         """Execute the workflow."""
+
+
+class BuiltinWorkflow(Workflow):
+    """BuiltinWorkflow is a sequence of operators that need to be executed.
+
+    Attributes:
+        _operator_graph (nx.DiGraph): The operator graph of the workflow.
+        _evaluator (Optional[Operator]): The operator to evaluate the progress of the workflow.
+    """
+
+    def _build_workflow(self, reasoner: Reasoner) -> Any:
+        """Build the workflow."""
+        raise NotImplementedError("This method is not implemented.")
+
+    async def _execute_workflow(
+        self,
+        workflow: Any,
+        job: Job,
+        workflow_messages: Optional[List[WorkflowMessage]] = None,
+        lesson: Optional[str] = None,
+    ) -> WorkflowMessage:
+        """Execute the workflow."""
+        raise NotImplementedError("This method is not implemented.")

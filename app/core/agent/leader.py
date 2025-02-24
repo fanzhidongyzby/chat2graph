@@ -53,6 +53,21 @@ class Leader(Agent):
         # TODO: add a judgment to check if the job needs to be decomposed (to modify the prompt)
 
         job = agent_message.get_payload()
+        assigned_expert_name: Optional[str] = job.assigned_expert_name
+        if assigned_expert_name:
+            expert = self.state.get_expert_by_name(assigned_expert_name)
+            job_graph: JobGraph = JobGraph()
+            job_graph.add_vertex(
+                job.id,
+                job=SubJob(
+                    id=job.id,
+                    session_id=job.session_id,
+                    goal=job.goal,
+                    context=job.goal + "\n" + job.context,
+                ),
+                expert_id=expert.get_id(),
+            )
+            return job_graph
 
         # get the expert list
         expert_profiles = [e.get_profile() for e in self._leader_state.list_experts()]
@@ -63,12 +78,7 @@ class Leader(Agent):
             ]
         )
 
-        job_decomp_prompt = JOB_DECOMPOSITION_PROMPT.format(
-            num_subtasks="N (by default)",
-            num_roles=3,
-            task=job.goal,
-            role_list=role_list,
-        )
+        job_decomp_prompt = JOB_DECOMPOSITION_PROMPT.format(task=job.goal, role_list=role_list)
         decompsed_job = SubJob(
             session_id=job.session_id,
             goal=job.goal,
@@ -102,7 +112,7 @@ class Leader(Agent):
                 ),
             )
             # add the subjob to the job graph
-            job_graph.add_node(
+            job_graph.add_vertex(
                 job_id,
                 job=subjob,
                 expert_id=self._leader_state.get_expert_by_name(
@@ -135,7 +145,7 @@ class Leader(Agent):
         # dispatch the agent messages to the corresponding agents. The objective is to make the
         # multi-agent system more flexible, scalable, and distributed.
 
-        pending_job_ids: Set[str] = set(job_graph.nodes())
+        pending_job_ids: Set[str] = set(job_graph.vertices())
         running_jobs: Dict[str, asyncio.Task] = {}  # job_id -> asyncio.Task
         job_results: Dict[str, WorkflowMessage] = {}  # job_id -> WorkflowMessage (result)
         job_inputs: Dict[str, AgentMessage] = {}  # job_id -> AgentMessage (input)

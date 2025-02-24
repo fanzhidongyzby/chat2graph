@@ -1,12 +1,11 @@
 from typing import List, Optional
 
 from app.core.env.insight.insight import Insight
-from app.core.knowledge.knowlege_service import KnowledgeService
 from app.core.model.job import Job
 from app.core.model.message import WorkflowMessage
 from app.core.model.task import Task
 from app.core.reasoner.reasoner import Reasoner
-from app.core.toolkit.toolkit import Toolkit, ToolkitService
+from app.core.service.toolkit_service import ToolkitService
 from app.core.workflow.operator_config import OperatorConfig
 
 
@@ -16,23 +15,11 @@ class Operator:
     Attributes:
         _id (str): The unique identifier of the operator.
         _config (OperatorConfig): The configuration of the operator.
-        _toolkit_service (ToolkitService): The toolkit service.
-        _knowledge_service (Optional[KnowledgeService]): The knowledge service.
-        _environment_service (Optional[KnowledgeService]): The environment service.
     """
 
-    def __init__(
-        self,
-        config: OperatorConfig,
-        toolkit_service: Optional[ToolkitService] = None,
-        knowledge_service: Optional[KnowledgeService] = None,
-        environment_service: Optional[KnowledgeService] = None,
-    ):
+    def __init__(self, config: OperatorConfig):
         self._config: OperatorConfig = config
-        # TODO: need to start the service firstly
-        self._toolkit_service: ToolkitService = toolkit_service or ToolkitService(Toolkit())
-        self._knowledge_service: Optional[KnowledgeService] = knowledge_service
-        self._environment_service: Optional[KnowledgeService] = environment_service
+        self._toolkit_service: ToolkitService = ToolkitService.instance
 
     async def execute(
         self,
@@ -51,7 +38,8 @@ class Operator:
     async def _build_task(
         self, job: Job, workflow_messages: Optional[List[WorkflowMessage]], lesson: Optional[str]
     ) -> Task:
-        rec_tools, rec_actions = await self._toolkit_service.get_toolkit().recommend_tools(
+        rec_tools, rec_actions = await self._toolkit_service.recommend_tools(
+            id=self.get_id(),
             actions=self._config.actions,
             threshold=self._config.threshold,
             hops=self._config.hops,
