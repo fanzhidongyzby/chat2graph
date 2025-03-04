@@ -22,7 +22,7 @@ JOB_DECOMPOSITION_PROMPT = """
 ## Dependencies: Define logical task flow in Gantt-chart compatible format
 ## Completion Criteria: Specify quantifiable completion criteria for each subtask
 
-"""
+"""  # noqa: E501
 
 JOB_DECOMPOSITION_OUTPUT_SCHEMA = """
 Here is the Subtasks Template
