@@ -64,3 +64,31 @@ class JobStatus(Enum):
     FINISHED = "FINISHED"
     FAILED = "FAILED"
     STOPPED = "STOPPED"
+
+
+class KnowledgeStoreType(Enum):
+    """Knowledge store type."""
+
+    VECTOR = "VECTOR"
+    GRAPH = "GRAPH"
+
+
+class KnowledgeStoreCategory(Enum):
+    """Knowledge store category."""
+
+    GLOBAL = "GLOBAL"
+    LOCAL = "LOCAL"
+
+
+class KnowledgeStoreFileStatus(Enum):
+    """Knowledge store file status."""
+
+    PENDING = "PENDING"
+    SUCCESS = "SUCCESS"
+    FAIL = "FAIL"
+
+
+class FileStorageType(Enum):
+    """File storage type."""
+
+    LOCAL = "LOCAL"
