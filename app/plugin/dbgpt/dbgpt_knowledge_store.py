@@ -34,8 +34,8 @@ class VectorKnowledgeStore(KnowledgeStore):
             config,
             name=name,
             embedding_fn=DefaultEmbeddingFactory.remote(
-                api_url=SystemEnv.EMBEDDING_MODEL_API_URL,
-                api_key=SystemEnv.EMBEDDING_API_KEY,
+                api_url=SystemEnv.EMBEDDING_MODEL_ENDPOINT,
+                api_key=SystemEnv.EMBEDDING_MODEL_APIKEY,
                 model_name=SystemEnv.EMBEDDING_MODEL_NAME,
             ),
         )
@@ -96,8 +96,8 @@ class GraphKnowledgeStore(KnowledgeStore):
             config=config,
             name=SystemEnv.TUGRAPH_NAME_PREFIX + name.replace("-", ""),
             embedding_fn=DefaultEmbeddingFactory.remote(
-                api_url=SystemEnv.EMBEDDING_MODEL_API_URL,
-                api_key=SystemEnv.EMBEDDING_API_KEY,
+                api_url=SystemEnv.EMBEDDING_MODEL_ENDPOINT,
+                api_key=SystemEnv.EMBEDDING_MODEL_APIKEY,
                 model_name=SystemEnv.EMBEDDING_MODEL_NAME,
             ),
             llm_client=DbgptLlmClient()._llm_client,

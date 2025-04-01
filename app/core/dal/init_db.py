@@ -1,3 +1,4 @@
+from app.core.common.system_env import SystemEnv
 from app.core.dal.database import Do, engine
 from app.core.dal.do.file_descriptor_do import FileDescriptorDo
 from app.core.dal.do.graph_db_do import GraphDbDo
@@ -12,7 +13,7 @@ def init_db() -> None:
     # Do.metadata.drop_all(bind=engine)
 
     # create tables in order
-    print("Prepare database tables ...")
+    print(f"System database url: {SystemEnv.DATABASE_URL}")
     GraphDbDo.__table__.create(engine, checkfirst=True)
     FileDescriptorDo.__table__.create(engine, checkfirst=True)
     KnowledgeBaseDo.__table__.create(engine, checkfirst=True)

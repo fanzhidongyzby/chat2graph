@@ -72,19 +72,26 @@ still many features that need to be improved together with the community.
 
 Prepare the required versions of Python and NodeJS.
 
-* Install Python: [Python >= 3.10](https://www.python.org/downloads)
-* Install NodeJS: [NodeJS >= 20.12.2](https://nodejs.org/en/download)
+* Install Python: [Python == 3.10](https://www.python.org/downloads) recommended.
+* Install NodeJS: [NodeJS >= v20](https://nodejs.org/en/download) recommended.
 
-You can also use tools like [conda][conda] to install the Python environment.
+You can also use tools like [conda][conda] to install the python environment.
 
 ### Build & Start
 
-Start Chat2Graph as follows.
+Build Chat2Graph as follows.
 
 ```bash
 git clone https://github.com/TuGraph-family/chat2graph.git
 cd chat2graph
 ./bin/build.sh
+```
+
+Then configure environment variables (e.g., LLM parameters) based on 
+[.env.template](.env.template), startup Chat2Graph.
+
+```bash
+cp .env.template .env && vim .env
 ./bin/start.sh
 ```
 
@@ -123,9 +130,9 @@ to your intelligent system.
 You can quickly converse with the built-in Chat2Graph in the following ways.
 
 ```python
-SystemEnv.PROXYLLM_BACKEND="gpt-4o-mini"
-SystemEnv.PROXY_SERVER_URL="https://api.openai-proxy.org/v1"
-SystemEnv.PROXY_API_KEY="<YOUR-OPENAI-API-KEY>"
+SystemEnv.LLM_NAME="gpt-4o-mini"
+SystemEnv.LLM_ENDPOINT="https://api.openai.com/v1"
+SystemEnv.LLM_APIKEY="<YOUR-OPENAI-API-KEY>"
 
 mas = AgenticService.load()
 question = TextMessage(payload = "What is TuGraph ?")

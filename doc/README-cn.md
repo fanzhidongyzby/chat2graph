@@ -61,19 +61,25 @@ Chat2Graph 目前提供了基础的智能体系统能力，仍有诸多特性需
 
 准备符合要求的 Python 和 NodeJS 版本。
 
-* Install Python: [Python >= 3.10](https://www.python.org/downloads)
-* Install NodeJS: [NodeJS >= 20.12.2](https://nodejs.org/en/download)
+* Install Python: 推荐 [Python == 3.10](https://www.python.org/downloads)。
+* Install NodeJS: 推荐 [NodeJS >= v20](https://nodejs.org/en/download)。
 
 你也可以使用 [conda][conda] 等工具安装Python环境。
 
 ### 构建启动
 
-按照如下方式启动 Chat2Graph。
+按照如下方式构建 Chat2Graph。
 
 ```bash
 git clone https://github.com/TuGraph-family/chat2graph.git
 cd chat2graph
 ./bin/build.sh
+```
+
+然后基于 [.env.template](../.env.template) 配置环境变量（如 LLM 参数），启动 Chat2Graph。
+
+```bash
+cp .env.template .env && vim .env
 ./bin/start.sh
 ```
 
@@ -110,9 +116,9 @@ Chat2Graph 的 SDK 提供了非常清晰简洁的 API，让你轻松构建访问
 通过以下方式，可以快速与内置的Chat2Graph进行对话。
 
 ```python
-SystemEnv.PROXYLLM_BACKEND="gpt-4o-mini"
-SystemEnv.PROXY_SERVER_URL="https://api.openai-proxy.org/v1"
-SystemEnv.PROXY_API_KEY="<YOUR-OPENAI-API-KEY>"
+SystemEnv.LLM_NAME="gpt-4o-mini"
+SystemEnv.LLM_ENDPOINT="https://api.openai.com/v1"
+SystemEnv.LLM_APIKEY="<YOUR-OPENAI-API-KEY>"
 
 mas = AgenticService.load()
 question = TextMessage(payload = "What is TuGraph ?")

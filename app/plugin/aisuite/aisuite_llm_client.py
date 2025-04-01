@@ -22,22 +22,22 @@ class AiSuiteLlmClient(ModelService):
         self._llm_client: Client = Client(
             provider_configs={
                 "openai": {
-                    "api_key": SystemEnv.PROXY_API_KEY,
-                    "base_url": SystemEnv.PROXY_SERVER_URL,
+                    "api_key": SystemEnv.LLM_APIKEY,
+                    "base_url": SystemEnv.LLM_ENDPOINT,
                 },
                 "anthropic": {
-                    "api_key": SystemEnv.PROXY_API_KEY,
-                    "base_url": SystemEnv.PROXY_SERVER_URL,
+                    "api_key": SystemEnv.LLM_APIKEY,
+                    "base_url": SystemEnv.LLM_ENDPOINT,
                 },
                 "google": {
-                    "api_key": SystemEnv.PROXY_API_KEY,
+                    "api_key": SystemEnv.LLM_APIKEY,
                     "project_id": SystemEnv.GOOGLE_PROJECT_ID,  # required by Google Vertex AI
                     "region": SystemEnv.GOOGLE_CLOUD_REGION,  # required by Google Vertex AI
                     "application_credentials": SystemEnv.GOOGLE_APPLICATION_CREDENTIALS,  # absolute path  # noqa: E501
                 },
             }
         )
-        self._model_alias = SystemEnv.PROXYLLM_BACKEND  # ex. "anthropic:claude-3-5-sonnet-20240620"
+        self._model_alias = SystemEnv.LLM_NAME  # ex. "anthropic:claude-3-5-sonnet-20240620"
 
     async def generate(
         self,

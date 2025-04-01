@@ -21,9 +21,9 @@ def create_app():
 
     service = AgenticService.load()
 
-    print("\n\n")
+    # print("\n\n")
     pyfiglet.print_figlet(service.name, font="standard")
-    print("\n\n")
+    # print("\n\n")
 
     @app.route("/")
     def serve_index():

@@ -33,9 +33,9 @@ class DbgptLlmClient(ModelService):
         # TODO: support other llm clients
         # TODO: support more llm client configurations
         self._llm_client: LLMClient = OpenAILLMClient(
-            model_alias=SystemEnv.PROXYLLM_BACKEND,
-            api_base=SystemEnv.PROXY_SERVER_URL,
-            api_key=SystemEnv.PROXY_API_KEY,
+            model_alias=SystemEnv.LLM_NAME,
+            api_base=SystemEnv.LLM_ENDPOINT,
+            api_key=SystemEnv.LLM_APIKEY,
             openai_kwargs={"temperature": SystemEnv.TEMPERATURE},
         )
 
@@ -115,7 +115,7 @@ class DbgptLlmClient(ModelService):
 
         model_messages = DbgptModelMessage.from_base_messages(base_messages)
         model_request = ModelRequest.build_request(
-            model=SystemEnv.PROXYLLM_BACKEND,
+            model=SystemEnv.LLM_NAME,
             messages=model_messages,
         )
 
