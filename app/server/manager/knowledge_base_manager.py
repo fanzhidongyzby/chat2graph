@@ -1,6 +1,5 @@
 from typing import Any, Dict, Tuple
 
-from app.core.common.type import KnowledgeStoreType
 from app.core.knowledge.knowledge_config import KnowledgeConfig
 from app.core.service.knowledge_base_service import KnowledgeBaseService
 from app.core.service.session_service import SessionService
@@ -14,34 +13,6 @@ class KnowledgeBaseManager:
         self._knowledge_base_service: KnowledgeBaseService = KnowledgeBaseService.instance
         self._session_service: SessionService = SessionService.instance
         self._knowledge_base_view: KnowledgeBaseViewTransformer = KnowledgeBaseViewTransformer()
-
-    def create_knowledge_base(
-        self, name: str, knowledge_type: str, session_id: str
-    ) -> Tuple[Dict[str, Any], str]:
-        """Create a new knowledge base and return the response data.
-
-        Args:
-            name (str): Name of the knowledge base
-            knowledge_type (str): Type of the knowledge base
-            session_id (str): ID of the associated session
-
-        Returns:
-            Tuple[Dict[str, Any], str]: A tuple containing knowledge base details and success
-                message
-        """
-        _ = self._session_service.get_session(session_id=session_id)
-
-        knowledge_base = self._knowledge_base_service.create_knowledge_base(
-            name=name, knowledge_type=KnowledgeStoreType(knowledge_type), session_id=session_id
-        )
-        # TODO: use knowledge base type Enum
-        data = {
-            "id": knowledge_base.id,
-            "name": knowledge_base.name,
-            "knowledge_type": knowledge_base.knowledge_type,
-            "session_id": knowledge_base.session_id,
-        }
-        return data, "Knowledge base created successfully"
 
     def get_knowledge_base(self, id: str) -> Tuple[Dict[str, Any], str]:
         """Get knowledge base details by ID.

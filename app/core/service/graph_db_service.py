@@ -1,8 +1,8 @@
-from typing import List, Optional
+from typing import List
 
 from app.core.common.singleton import Singleton
 from app.core.dal.dao.graph_db_dao import GraphDbDao
-from app.core.model.graph_db import GraphDB
+from app.core.model.graph_db import GraphDbConfig
 
 
 class GraphDbService(metaclass=Singleton):
@@ -11,53 +11,39 @@ class GraphDbService(metaclass=Singleton):
     def __init__(self):
         self._graph_db_dao: GraphDbDao = GraphDbDao.instance
 
-    def create_graph_db(
-        self, ip: str, port: str, user: str, pwd: str, desc: str, name: str, is_default_db: bool
-    ) -> GraphDB:
-        """Create a new GraphDB.
+    def create_graph_db(self, graph_db_config: GraphDbConfig) -> GraphDbConfig:
+        """Create a new GraphDB."""
 
-        Args:
-            ip (str): Ip of the GraphDB
-            port (str): Port of the GraphDB
-            user (str): Username for the GraphDB
-            pwd (str): Password for the GraphDB
-            desc (str): Description of the GraphDB
-            name (str): Name of the GraphDB
-            is_default_db (bool): Whether this GraphDB is the default database
+        # determinate default flag
+        graph_db_config.is_default_db = self._graph_db_dao.count() == 0
 
-        Returns:
-            GraphDB: GraphDB object
-        """
-        # create the GraphDB
         result = self._graph_db_dao.create(
-            ip=ip, port=port, user=user, pwd=pwd, desc=desc, name=name, is_default_db=is_default_db
-        )
-        return GraphDB(
-            ip=str(result.ip),
-            id=str(result.id),
-            port=int(result.port),
-            user=str(result.user),
-            pwd=str(result.pwd),
-            desc=str(result.desc),
-            name=str(result.name),
-            is_default_db=bool(result.is_default_db),
+            type=graph_db_config.type.value,
+            name=graph_db_config.name,
+            desc=graph_db_config.desc,
+            host=graph_db_config.host,
+            port=graph_db_config.port,
+            user=graph_db_config.user,
+            pwd=graph_db_config.pwd,
+            is_default_db=graph_db_config.is_default_db,
+            default_schema=graph_db_config.default_schema,
         )
 
-    def get_graph_db(self, id: str) -> GraphDB:
+        return GraphDbConfig.from_do(result)
+
+    def get_default_graph_db(self) -> GraphDbConfig:
+        """Get the default GraphDB."""
+        graph_db_do = self._graph_db_dao.get_by_default()
+        if not graph_db_do:
+            raise ValueError("Default GraphDB not found")
+        return GraphDbConfig.from_do(graph_db_do)
+
+    def get_graph_db(self, id: str) -> GraphDbConfig:
         """Get a GraphDB by ID."""
-        result = self._graph_db_dao.get_by_id(id=id)
-        if not result:
+        graph_db_do = self._graph_db_dao.get_by_id(id=id)
+        if not graph_db_do:
             raise ValueError(f"GraphDB with ID {id} not found")
-        return GraphDB(
-            id=str(result.id),
-            ip=str(result.ip),
-            port=int(result.port),
-            user=str(result.user),
-            pwd=str(result.pwd),
-            desc=str(result.desc),
-            name=str(result.name),
-            is_default_db=bool(result.is_default_db),
-        )
+        return GraphDbConfig.from_do(graph_db_do)
 
     def delete_graph_db(self, id: str):
         """Delete a GraphDB by ID."""
@@ -66,91 +52,59 @@ class GraphDbService(metaclass=Singleton):
             raise ValueError(f"GraphDB with ID {id} not found")
         self._graph_db_dao.delete(id=id)
 
-    def update_graph_db(
-        self,
-        id: str,
-        ip: Optional[str] = None,
-        port: Optional[int] = None,
-        user: Optional[str] = None,
-        pwd: Optional[str] = None,
-        desc: Optional[str] = None,
-        name: Optional[str] = None,
-        is_default_db: Optional[bool] = None,
-    ) -> GraphDB:
+    def update_graph_db(self, graph_db_config: GraphDbConfig) -> GraphDbConfig:
         """Update a GraphDB by ID.
 
         Args:
-            id (str): ID of the GraphDB
-            ip (Optional[str]): New IP of the GraphDB
-            port (Optional[int]): New port of the GraphDB
-            user (Optional[str]): New user of the GraphDB
-            pwd (Optional[str]): New password of the GraphDB
-            desc (Optional[str]): New description of the GraphDB
-            name (Optional[str]): New name of the GraphDB
-            is_default_db (Optional[bool]): New value of is_default_db
+            graph_db_config (GraphDbConfig): GraphDB configuration
+
         Returns:
             GraphDB: Updated GraphDB object
         """
-        graph_db = self._graph_db_dao.get_by_id(id=id)
-        if not graph_db:
+        id = graph_db_config.id
+        assert id is not None, "ID is required to update a GraphDB"
+        graph_db_do = self._graph_db_dao.get_by_id(id=id)
+        if not graph_db_do:
             raise ValueError(f"GraphDB with ID {id} not found")
+
+        # check default flag
+        if graph_db_do.is_default_db and not graph_db_config.is_default_db:
+            raise ValueError("At least one default GraphDB required")
+
+        if not graph_db_do.is_default_db and graph_db_config.is_default_db:
+            self._graph_db_dao.set_as_default(id=id)
+
         update_fields = {
-            "ip": ip,
-            "port": port,
-            "user": user,
-            "pwd": pwd,
-            "desc": desc,
-            "name": name,
-            "is_default_db": is_default_db,
+            "type": graph_db_config.type.value if graph_db_config.type else None,
+            "name": graph_db_config.name,
+            "desc": graph_db_config.desc,
+            "host": graph_db_config.host,
+            "port": graph_db_config.port,
+            "user": graph_db_config.user,
+            "pwd": graph_db_config.pwd,
+            "is_default_db": graph_db_config.is_default_db,
+            "default_schema": graph_db_config.default_schema,
         }
 
         fields_to_update = {
             field: new_value
             for field, new_value in update_fields.items()
-            if new_value is not None and getattr(graph_db, field) != new_value
+            if new_value is not None and getattr(graph_db_do, field) != new_value
         }
 
         if fields_to_update:
-            updated_graph_db = self._graph_db_dao.update(id=id, **fields_to_update)
-            return GraphDB(
-                id=str(updated_graph_db.id),
-                ip=str(updated_graph_db.ip),
-                port=int(updated_graph_db.port),
-                user=str(updated_graph_db.user),
-                pwd=str(updated_graph_db.pwd),
-                desc=str(updated_graph_db.desc),
-                name=str(updated_graph_db.name),
-                is_default_db=bool(updated_graph_db.is_default_db),
-            )
-        return GraphDB(
-            id=str(graph_db.id),
-            ip=str(graph_db.ip),
-            port=int(graph_db.port),
-            user=str(graph_db.user),
-            pwd=str(graph_db.pwd),
-            desc=str(graph_db.desc),
-            name=str(graph_db.name),
-            is_default_db=bool(graph_db.is_default_db),
-        )
+            assert graph_db_config.id is not None, "ID must be provided for update"
+            result = self._graph_db_dao.update(id=graph_db_config.id, **fields_to_update)
+            return GraphDbConfig.from_do(result)
 
-    def get_all_graph_dbs(self) -> List[GraphDB]:
+        return GraphDbConfig.from_do(graph_db_do)
+
+    def get_all_graph_dbs(self) -> List[GraphDbConfig]:
         """Get all GraphDBs."""
 
         results = self._graph_db_dao.get_all()
-        return [
-            GraphDB(
-                ip=str(result.ip),
-                id=str(result.id),
-                port=int(result.port),
-                user=str(result.user),
-                pwd=str(result.pwd),
-                desc=str(result.desc),
-                name=str(result.name),
-                is_default_db=bool(result.is_default_db),
-            )
-            for result in results
-        ]
+        return [GraphDbConfig.from_do(result) for result in results]
 
-    def validate_graph_connection(self, ip: str, port: str, user: str, pwd: str) -> bool:
+    def validate_graph_db_connection(self, graph_db_config: GraphDbConfig) -> bool:
         """Validate connection to a graph database."""
         raise NotImplementedError("Method not implemented")

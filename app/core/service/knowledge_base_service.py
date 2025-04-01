@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from sqlalchemy import func
 
@@ -17,7 +17,6 @@ from app.core.dal.dao.knowledge_dao import FileKbMappingDao, KnowledgeBaseDao
 from app.core.knowledge.knowledge_config import KnowledgeConfig
 from app.core.knowledge.knowledge_store_factory import KnowledgeStoreFactory
 from app.core.model.file_descriptor import FileDescriptor
-from app.core.model.job import Job
 from app.core.model.knowledge import Knowledge
 from app.core.model.knowledge_base import (
     GlobalKnowledgeBase,
@@ -116,6 +115,27 @@ class KnowledgeBaseService(metaclass=Singleton):
             )
         raise ValueError(f"Cannot find knowledge base with ID {id}")
 
+    def get_session_knowledge_base(self, session_id: str) -> Optional[KnowledgeBase]:
+        """Get a knowledge base by Session ID."""
+
+        # fetch the knowledge base
+        results = self._knowledge_base_dao.filter_by(session_id=session_id)
+        result = results[0] if results else None
+
+        if result:
+            return KnowledgeBase(
+                id=str(result.id),
+                name=str(result.name),
+                knowledge_type=str(result.knowledge_type),
+                session_id=str(result.session_id),
+                file_descriptors=[],
+                description=str(result.description),
+                category=str(result.category),
+                timestamp=int(result.timestamp),
+            )
+
+        return None
+
     def update_knowledge_base(self, id: str, name: str, description: str) -> None:
         """Update a knowledge base by ID.
         Args:
@@ -138,14 +158,14 @@ class KnowledgeBaseService(metaclass=Singleton):
         knowledge_base = self._knowledge_base_dao.get_by_id(id=id)
         if not knowledge_base:
             raise ValueError(f"Knowledge base with ID {id} not found")
-        # delte all related file and file_kb_mapping from db
+        # delete all related file and file_kb_mapping from db
         mappings = self._file_kb_mapping_dao.filter_by(kb_id=id)
         for mapping in mappings:
             self._file_kb_mapping_dao.delete(id=str(mapping.id))
             FileService.instance.delete_file(id=str(mapping.id))
         # delete kb from db
         self._knowledge_base_dao.delete(id=id)
-        # delete knolwledge base folder
+        # delete knowledge base folder
         KnowledgeStoreFactory.get_or_create(id).drop()
 
     def get_all_knowledge_bases(self) -> Tuple[KnowledgeBase, List[KnowledgeBase]]:
@@ -212,22 +232,22 @@ class KnowledgeBaseService(metaclass=Singleton):
             )
         return global_kb, local_kbs
 
-    def get_knowledge(self, query: str, job: Job) -> Knowledge:
+    def get_knowledge(self, query: str, session_id: Optional[str]) -> Knowledge:
         """Get knowledge by ID."""
         # get global knowledge
         global_chunks = KnowledgeStoreFactory.get_or_create(str(self._global_kb_do.id)).retrieve(
             query
         )
         # get local knowledge
-        kbs = self._knowledge_base_dao.filter_by(session_id=job.session_id)
-        if len(kbs) == 1:
-            kb = kbs[0]
-            knowledge_base_id = kb.id
-            local_chunks = KnowledgeStoreFactory.get_or_create(str(knowledge_base_id)).retrieve(
-                query
-            )
-        else:
-            local_chunks = []
+        local_chunks = []
+        if session_id:
+            kbs = self._knowledge_base_dao.filter_by(session_id=session_id)
+            if len(kbs) == 1:
+                kb = kbs[0]
+                knowledge_base_id = kb.id
+                local_chunks = KnowledgeStoreFactory.get_or_create(str(knowledge_base_id)).retrieve(
+                    query
+                )
         return Knowledge(global_chunks, local_chunks)
 
     def load_knowledge(
@@ -235,10 +255,10 @@ class KnowledgeBaseService(metaclass=Singleton):
     ) -> None:
         """Load new knowledge entry."""
         # get file with file id
-        file = self._file_descriptor_dao.get_by_id(id=file_id)
-        if file:
-            folder_path = file.path
-            file_name = file.name
+        file_descriptor_do = self._file_descriptor_dao.get_by_id(id=file_id)
+        if file_descriptor_do:
+            folder_path = file_descriptor_do.path
+            file_name = file_descriptor_do.name
             file_path = os.path.join(folder_path, os.listdir(folder_path)[0])
 
             # add file_kb_mapping

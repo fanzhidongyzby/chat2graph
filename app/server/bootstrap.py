@@ -2,22 +2,28 @@ import os
 
 from flask import Flask, send_from_directory
 from flask_cors import CORS  # type: ignore
+import pyfiglet  # type: ignore
 
 from app.core.dal.init_db import init_db
 from app.core.sdk.agentic_service import AgenticService
 from app.server.api import register_blueprints
-from app.server.common.util import ApiException, make_error_response
+from app.server.common.util import make_error
 
 
 def create_app():
     """Create the Flask app."""
     static_folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
+    print(f"Web resources location: {static_folder_path}")
     app = Flask(__name__, static_folder=static_folder_path)
 
     with app.app_context():
         init_db()
 
-    AgenticService.load()
+    service = AgenticService.load()
+
+    print("\n\n")
+    pyfiglet.print_figlet(service.name, font="standard")
+    print("\n\n")
 
     @app.route("/")
     def serve_index():
@@ -34,13 +40,14 @@ def create_app():
 
     register_blueprints(app)
 
-    @app.errorhandler(ApiException)
-    def handle_base_exception(e):
-        return make_error_response(e.status_code, e.message)
+    @app.errorhandler(Exception)
+    def handle_base_exception(e: Exception):
+        return make_error(e)
 
     return app
 
 
 if __name__ == "__main__":
+    print("Starting server...")
     app = create_app()
     app.run(debug=False)

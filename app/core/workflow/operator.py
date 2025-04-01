@@ -1,13 +1,17 @@
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from app.core.common.async_func import run_async_function
 from app.core.env.insight.insight import Insight
-from app.core.model.job import Job
+from app.core.model.file_descriptor import FileDescriptor
+from app.core.model.job import Job, SubJob
 from app.core.model.knowledge import Knowledge
-from app.core.model.message import WorkflowMessage
+from app.core.model.message import FileMessage, HybridMessage, MessageType, WorkflowMessage
 from app.core.model.task import Task
 from app.core.reasoner.reasoner import Reasoner
+from app.core.service.file_service import FileService
+from app.core.service.job_service import JobService
 from app.core.service.knowledge_base_service import KnowledgeBaseService
+from app.core.service.message_service import MessageService
 from app.core.service.toolkit_service import ToolkitService
 from app.core.workflow.operator_config import OperatorConfig
 
@@ -23,16 +27,34 @@ class Operator:
     def __init__(self, config: OperatorConfig):
         self._config: OperatorConfig = config
         self._toolkit_service: ToolkitService = ToolkitService.instance
+        self._file_service: FileService = FileService.instance
+        self._message_service: MessageService = MessageService.instance
+        self._job_service: JobService = JobService.instance
 
     def execute(
         self,
         reasoner: Reasoner,
         job: Job,
         workflow_messages: Optional[List[WorkflowMessage]] = None,
+        previous_expert_outputs: Optional[List[WorkflowMessage]] = None,
         lesson: Optional[str] = None,
     ) -> WorkflowMessage:
-        """Execute the operator by LLM client."""
-        task = self._build_task(job, workflow_messages, lesson)
+        """Execute the operator by LLM client.
+
+        Args:
+            reasoner (Reasoner): The reasoner.
+            job (Job): The job assigned to the expert.
+            workflow_messages (Optional[List[WorkflowMessage]]): The outputs of previous operators.
+            previous_expert_outputs (Optional[List[WorkflowMessage]]): The outputs of previous
+                experts in workflow message type.
+            lesson (Optional[str]): The lesson learned (provided by the successor expert).
+        """
+        task = self._build_task(
+            job=job,
+            workflow_messages=workflow_messages,
+            previous_expert_outputs=previous_expert_outputs,
+            lesson=lesson,
+        )
 
         result = run_async_function(reasoner.infer, task=task)
 
@@ -41,23 +63,49 @@ class Operator:
     def _build_task(
         self,
         job: Job,
-        workflow_messages: Optional[List[WorkflowMessage]],
-        lesson: Optional[str],
+        workflow_messages: Optional[List[WorkflowMessage]] = None,
+        previous_expert_outputs: Optional[List[WorkflowMessage]] = None,
+        lesson: Optional[str] = None,
     ) -> Task:
         rec_tools, rec_actions = self._toolkit_service.recommend_tools_actions(
             actions=self._config.actions,
             threshold=self._config.threshold,
             hops=self._config.hops,
         )
+        merged_workflow_messages: List[WorkflowMessage] = workflow_messages or []
+        merged_workflow_messages.extend(previous_expert_outputs or [])
+
+        # get the file descriptors, to provide some way of an access to the content of the files
+        file_descriptors: List[FileDescriptor] = []
+        if isinstance(job, SubJob):
+            original_job_id: Optional[str] = job.original_job_id
+            assert original_job_id is not None, "SubJob must have an original job id"
+            hybrid_messages: List[HybridMessage] = cast(
+                List[HybridMessage],
+                self._message_service.get_message_by_job_id(
+                    job_id=original_job_id, message_type=MessageType.HYBRID_MESSAGE
+                ),
+            )
+            for hybrid_message in hybrid_messages:
+                # get the file descriptors from the hybrid message
+                attached_messages = hybrid_message.get_attached_messages()
+                for attached_message in attached_messages:
+                    if isinstance(attached_message, FileMessage):
+                        file_descriptor = self._file_service.get_file_descriptor(
+                            file_id=attached_message.get_file_id()
+                        )
+                        file_descriptors.append(file_descriptor)
+
         task = Task(
             job=job,
             operator_config=self._config,
-            workflow_messages=workflow_messages,
+            workflow_messages=merged_workflow_messages,
             tools=rec_tools,
             actions=rec_actions,
             knowledge=self.get_knowledge(job),
             insights=self.get_env_insights(),
             lesson=lesson,
+            file_descriptors=file_descriptors,
         )
         return task
 
@@ -65,7 +113,7 @@ class Operator:
         """Get the knowledge from the knowledge base."""
         query = "[JOB TARGET GOAL]:\n" + job.goal + "\n[INPUT INFORMATION]:\n" + job.context
         knowledge_base_service: KnowledgeBaseService = KnowledgeBaseService.instance
-        return knowledge_base_service.get_knowledge(query, job)
+        return knowledge_base_service.get_knowledge(query, job.session_id)
 
     def get_env_insights(self) -> Optional[List[Insight]]:
         """Get the environment information."""

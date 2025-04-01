@@ -46,6 +46,10 @@ class AgenticService(metaclass=Singleton):
         self._toolkit_service: ToolkitService = ToolkitService.instance
         self._reasoner_service: ReasonerService = ReasonerService.instance
 
+    @property
+    def name(self) -> str:
+        return self._service_name
+
     def session(self, session_id: Optional[str] = None) -> SessionWrapper:
         """Get the session, if not exists or session_id is None, create a new one."""
         return SessionWrapper(self._session_service.get_session(session_id=session_id))
@@ -111,9 +115,11 @@ class AgenticService(metaclass=Singleton):
     ) -> "AgenticService":
         """Configure the AgenticService from yaml file."""
 
+        print(f"Loading AgenticService from {yaml_path} with encoding {encoding}")
         agentic_service_config = AgenticConfig.from_yaml(yaml_path, encoding)
 
         # create an instance of AgenticService
+        print(f"Init application: {agentic_service_config.app.name}")
         mas = AgenticService(agentic_service_config.app.name)
 
         # tools and actions
@@ -158,11 +164,13 @@ class AgenticService(metaclass=Singleton):
             agentic_service_config.plugin.get_workflow_platform_type()
         )
 
-        mas.leader(name="Leader Test").workflow(
+        print("Init the Leader agent")
+        mas.leader(name="Leader").workflow(
             job_decomposition_operator, platform_type=workflow_platform_type
         ).build()
 
         # configure the experts
+        print("Init the Expert agents")
         for expert_config in agentic_service_config.experts:
             expert_wrapper = mas.expert(
                 name=expert_config.profile.name, description=expert_config.profile.desc
@@ -199,6 +207,8 @@ class AgenticService(metaclass=Singleton):
                 else:
                     raise ValueError("Operator chain in the workflow cannot be empty.")
 
-            expert_wrapper.evaluator().build()
+            # do not set the evaluator in the workflow
+            # expert_wrapper.evaluator().build()
+            expert_wrapper.build()
 
         return mas

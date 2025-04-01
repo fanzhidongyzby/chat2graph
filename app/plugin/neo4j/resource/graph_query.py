@@ -1,17 +1,11 @@
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
+from app.core.service.file_service import FileService
 from app.core.toolkit.tool import Tool
-from app.plugin.neo4j.neo4j_store import get_neo4j
+from app.plugin.neo4j.graph_store import get_graph_db
+from app.plugin.neo4j.resource.doc import QUERY_GRAMMER
 from app.plugin.neo4j.resource.read_doc import SchemaManager
-
-QUERY_GRAMMER = """
-===== 图vertex查询语法书 =====
-简单例子：
-MATCH (p:种类 {筛选条件}) RETURN p
-MATCH (p:种类), (q:种类) WHERE p,q的条件 RETURN p,q
-=====
-"""
 
 
 class SchemaGetter(Tool):
@@ -25,7 +19,7 @@ class SchemaGetter(Tool):
             function=self.get_schema,
         )
 
-    async def get_schema(self) -> str:
+    async def get_schema(self, file_service: FileService) -> str:
         """Get the schema of the graph database.
 
         Args:
@@ -34,7 +28,7 @@ class SchemaGetter(Tool):
         Returns:
             str: The schema of the graph database in string format
         """
-        schema = await SchemaManager.read_schema()
+        schema = await SchemaManager.read_schema(file_service=file_service)
 
         result = "# Neo4j Graph Schema\n\n"
 
@@ -205,7 +199,7 @@ WHERE {where_clause}
 RETURN {distinct_keyword}n
         """
 
-        store = get_neo4j()
+        store = get_graph_db()
         results = []
 
         with store.conn.session() as session:
