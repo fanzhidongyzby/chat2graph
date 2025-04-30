@@ -1,11 +1,13 @@
 
-# Introduction
+# User Manual
 
-Welcome to Chat2Graph! This application allows you to interact with graph experts through a chat interface to perform various graph-related tasks, including design, data extraction, and querying. This manual will guide you through the features and usage of the Chat2Graph application.
+Welcome to Chat2Graph! This application allows you to interact with graph experts through a 
+chat interface to perform various graph-related tasks, including design, extraction, query,
+analysis and Q&A. This manual will guide you through the features and usage of the Chat2Graph.
 
 ![alt text](./img/chat-layout-1.png)
 
-# Documentation Index
+# Index
 
 * [Chat](./chat/chat.md)
 
