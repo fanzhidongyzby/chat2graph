@@ -12,6 +12,21 @@
 [![License](https://shields.io/github/license/tugraph-family/chat2graph?logo=apache&label=License&color=blue)](https://www.apache.org/licenses/LICENSE-2.0.html)
 [![Release](https://shields.io/github/v/release/tugraph-family/chat2graph.svg?logo=stackblitz&label=Version&color=red)](https://github.com/TuGraph-family/chat2graph/releases)
 
+1。
+[![B站视频](doc/img/head.png)](https://www.bilibili.com/video/BV1UQGCzSExn)
+
+2。
+<video src="https://www.bilibili.com/video/BV15CjPztEgg" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px; min-height: 200px"></video>
+
+3。
+<video src="https://youtu.be/Co3ntqYpl60" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px; min-height: 200px"></video>
+
+4。
+https://www.bilibili.com/video/BV15CjPztEgg
+
+5。
+https://youtu.be/Co3ntqYpl60
+
 ## Background
 
 Traditional tabular data processing technologies, such as distributed databases, data warehouses, 
