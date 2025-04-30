@@ -136,7 +136,7 @@ After registering the graph database to Chat2Graph in "Backend Manager", you can
 of "chat to graph".
 ![](doc/img/gdb-mng.png)
 
-The currently supported graph databases are:
+The graph databases currently supported by Docker are:
 
 * Neo4j
 
@@ -146,7 +146,9 @@ docker run -d -p 7474:7474 -p 7687:7687 --name neo4j-server --env NEO4J_AUTH=non
   --env NEO4J_PLUGINS='["apoc", "graph-data-science"]' neo4j:latest
 ```
 
-* TuGraph
+* TuGraph-DB
+
+**Note**: we will support TuGraph-DB connectivity in the future.
 
 ```bash
 docker pull tugraph/tugraph-runtime-centos7:4.5.1
@@ -162,9 +164,9 @@ to your intelligent system.
 You can quickly converse with the built-in Chat2Graph in the following ways.
 
 ```python
-SystemEnv.LLM_NAME="gpt-4o-mini"
-SystemEnv.LLM_ENDPOINT="https://api.openai.com/v1"
-SystemEnv.LLM_APIKEY="<YOUR-OPENAI-API-KEY>"
+SystemEnv.LLM_NAME="gemini-2.0-flash" # or gemini-2.5-flash-preview-04-17 recommended
+SystemEnv.LLM_ENDPOINT="https://generativelanguage.googleapis.com/v1beta/openai/"
+SystemEnv.LLM_APIKEY="<YOUR-GEMINI-API-KEY>"
 
 mas = AgenticService.load()
 question = TextMessage(payload = "What is TuGraph ?")
