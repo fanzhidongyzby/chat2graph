@@ -1,6 +1,5 @@
 from typing import List, Optional, cast
 
-from app.core.common.async_func import run_async_function
 from app.core.env.insight.insight import Insight
 from app.core.model.file_descriptor import FileDescriptor
 from app.core.model.job import Job, SubJob
@@ -11,6 +10,7 @@ from app.core.reasoner.reasoner import Reasoner
 from app.core.service.file_service import FileService
 from app.core.service.knowledge_base_service import KnowledgeBaseService
 from app.core.service.message_service import MessageService
+from app.core.service.tool_connection_service import ToolConnectionService
 from app.core.service.toolkit_service import ToolkitService
 from app.core.workflow.operator_config import OperatorConfig
 
@@ -26,7 +26,7 @@ class Operator:
     def __init__(self, config: OperatorConfig):
         self._config: OperatorConfig = config
 
-    def execute(
+    async def execute(
         self,
         reasoner: Reasoner,
         job: Job,
@@ -51,7 +51,12 @@ class Operator:
             lesson=lesson,
         )
 
-        result = run_async_function(reasoner.infer, task=task)
+        # infer by the reasoner
+        result = await reasoner.infer(task=task)
+
+        # destroy MCP connections for the operator
+        tool_connection_service: ToolConnectionService = ToolConnectionService.instance
+        await tool_connection_service.release_connection(call_tool_ctx=task.get_tool_call_ctx())
 
         return WorkflowMessage(payload={"scratchpad": result}, job_id=job.id)
 
@@ -71,6 +76,7 @@ class Operator:
             threshold=self._config.threshold,
             hops=self._config.hops,
         )
+
         merged_workflow_messages: List[WorkflowMessage] = workflow_messages or []
         merged_workflow_messages.extend(previous_expert_outputs or [])
 

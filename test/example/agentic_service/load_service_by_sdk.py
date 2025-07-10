@@ -30,33 +30,29 @@ from app.plugin.neo4j.resource.graph_modeling import (
 )
 from app.plugin.neo4j.resource.graph_query import CypherExecutor
 from app.plugin.neo4j.resource.question_answering import (
-    InternetRetriever,
     KnowledgeBaseRetriever,
 )
 from app.plugin.neo4j.resource.system_checking import SystemStatusChecker
 
-document_reader_tool = DocumentReader(id="document_reader_tool")
-vertex_label_adder_tool = VertexLabelAdder(id="vertex_label_adder_tool")
-edge_label_adder_tool = EdgeLabelAdder(id="edge_label_adder_tool")
-graph_reachability_getter_tool = GraphReachabilityGetter(id="graph_reachability_getter_tool")
-schema_getter_tool = SchemaGetter(id="schema_getter_tool")
-data_status_check_tool = DataStatusCheck(id="data_status_check_tool")
-data_import_tool = DataImport(id="data_import_tool")
-cypher_executor_tool = CypherExecutor(id="cypher_executor_tool")
-algorithms_getter_tool = AlgorithmsGetter(id="algorithms_getter_tool")
-page_rank_executor_tool = PageRankExecutor(id="page_rank_executor_tool")
-betweenness_centrality_executor_tool = BetweennessCentralityExecutor(
-    id="betweenness_centrality_executor_tool"
-)
-louvain_executor_tool = LouvainExecutor(id="louvain_executor_tool")
-label_propagation_executor_tool = LabelPropagationExecutor(id="label_propagation_executor_tool")
-shortest_path_executor_tool = ShortestPathExecutor(id="shortest_path_executor_tool")
-node_similarity_executor_tool = NodeSimilarityExecutor(id="node_similarity_executor_tool")
-common_neighbors_executor_tool = CommonNeighborsExecutor(id="common_neighbors_executor_tool")
-kmeans_executor_tool = KMeansExecutor(id="kmeans_executor_tool")
-knowledge_base_retriever_tool = KnowledgeBaseRetriever(id="knowledge_base_retriever_tool")
-internet_retriever_tool = InternetRetriever(id="internet_retriever_tool")
-system_status_checker_tool = SystemStatusChecker(id="system_status_checker_tool")
+document_reader_tool = DocumentReader()
+vertex_label_adder_tool = VertexLabelAdder()
+edge_label_adder_tool = EdgeLabelAdder()
+graph_reachability_getter_tool = GraphReachabilityGetter()
+schema_getter_tool = SchemaGetter()
+data_status_check_tool = DataStatusCheck()
+data_import_tool = DataImport()
+cypher_executor_tool = CypherExecutor()
+algorithms_getter_tool = AlgorithmsGetter()
+page_rank_executor_tool = PageRankExecutor()
+betweenness_centrality_executor_tool = BetweennessCentralityExecutor()
+louvain_executor_tool = LouvainExecutor()
+label_propagation_executor_tool = LabelPropagationExecutor()
+shortest_path_executor_tool = ShortestPathExecutor()
+node_similarity_executor_tool = NodeSimilarityExecutor()
+common_neighbors_executor_tool = CommonNeighborsExecutor()
+kmeans_executor_tool = KMeansExecutor()
+knowledge_base_retriever_tool = KnowledgeBaseRetriever()
+system_status_checker_tool = SystemStatusChecker()
 
 content_understanding_action = Action(
     id="content_understanding_action",
@@ -359,7 +355,7 @@ algorithms_execute_operator = (
     .build()
 )
 
-retrieving_operator = (
+retrieval_operator = (
     OperatorWrapper()
     .instruction(
         """你是一位专业的文档检索专家。你的工作是，从知识库中检索与问题相关的文档，
@@ -384,7 +380,7 @@ retrieving_operator = (
     .build()
 )
 
-summarizing_operator = (
+summary_operator = (
     OperatorWrapper()
     .instruction(
         """你是一位文档总结专家,擅长总结归纳不同来源的文档。你需要根据用户的问题，总结归纳出用户需要的答案。
@@ -497,7 +493,7 @@ def main():
         **当任务是请求关于某个概念、技术、产品（例如，“介绍一下 Graph”）的一般性信息、定义、解释、比较或总结时，他是首选且通常是唯一的专家，** 尤其是当问题不涉及操作或查询一个具体的、已存在数据的图数据库实例时。
         他的任务是：1. 理解问题。 2. 从通用知识库、互联网或提供的文档中检索最相关的信息。 3. 综合信息并生成一个全面、清晰的回答。
         他会输出对问题的直接回答。**他完全不与任何项目特定的图数据库交互，不执行图查询或图算法，也不进行数据建模或导入。他专注于提供信息和解释，而非操作数据。** (类似于 RAG)""",  # noqa: E501
-    ).workflow((retrieving_operator, summarizing_operator), platform_type=workflow_platform).build()
+    ).workflow((retrieval_operator, summary_operator), platform_type=workflow_platform).build()
 
     mas.graph_db(
         graph_db_congfig=Neo4jDbConfig(

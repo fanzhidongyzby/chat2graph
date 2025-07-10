@@ -1,27 +1,23 @@
+from typing import List
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
 
-from app.core.dal.dao.dao_factory import DaoFactory
-from app.core.dal.database import DbSession
-from app.core.dal.init_db import init_db
 from app.core.model.job import SubJob
 from app.core.model.knowledge import Knowledge
 from app.core.model.message import WorkflowMessage
 from app.core.model.task import Task
 from app.core.reasoner.dual_model_reasoner import DualModelReasoner
-from app.core.service.knowledge_base_service import KnowledgeBaseService
 from app.core.service.toolkit_service import ToolkitService
 from app.core.toolkit.action import Action
+from app.core.toolkit.tool import Tool
 from app.core.workflow.operator import Operator
 from app.core.workflow.operator_config import OperatorConfig
-from test.resource.tool_resource import Query
+from test.resource.init_server import init_server
+from test.resource.tool_resource import ExampleQuery
 
-init_db()
-# initialize the dao
-DaoFactory.initialize(DbSession())
-knowledge_base_service: KnowledgeBaseService = KnowledgeBaseService()
+init_server()
 
 
 @pytest.fixture
@@ -58,7 +54,11 @@ async def operator():
     ]
 
     # create tools
-    tools = [Query(id=f"{action.id}_tool") for action in actions]
+    tools: List[Tool] = []
+    for action in actions:
+        tool = ExampleQuery()
+        tool._id = f"{action.id}_tool"
+        tools.append(tool)
 
     config = OperatorConfig(
         instruction="Test instruction",
@@ -94,7 +94,7 @@ async def test_execute_basic_functionality(operator: Operator, mock_reasoner: As
     )
     workflow_message = WorkflowMessage(payload={"scratchpad": "Test scratchpad"}, job_id=job.id)
 
-    op_output = operator.execute(
+    op_output = await operator.execute(
         reasoner=mock_reasoner,
         workflow_messages=[workflow_message],
         job=job,
@@ -110,7 +110,7 @@ async def test_execute_basic_functionality(operator: Operator, mock_reasoner: As
     task: Task = call_args["task"]
     actions = task.actions
     assert len(actions) == 3
-    assert all(isinstance(tool, Query) for tool in task.tools)
+    assert all(isinstance(tool, ExampleQuery) for tool in task.tools)
 
     # verify return value
     assert isinstance(op_output, WorkflowMessage)
@@ -129,12 +129,12 @@ async def test_get_tools_from_actions(operator: Operator):
 
     # verify correct number and type of tools
     assert len(tools) == 3
-    assert all(isinstance(tool, Query) for tool in tools)
+    assert all(isinstance(tool, ExampleQuery) for tool in tools)
 
-    # verify tool IDs match expected pattern
-    expected_tool_ids = {"search_tool", "analyze_tool", "generate_tool"}
-    actual_tool_ids = {tool.id for tool in tools}
-    assert actual_tool_ids == expected_tool_ids
+    # verify tool names match expected pattern
+    expected_tool_names = ["query_tool", "query_tool", "query_tool"]
+    actual_tool_names = [tool.name for tool in tools]
+    assert actual_tool_names == expected_tool_names
 
 
 @pytest.mark.asyncio
@@ -171,6 +171,8 @@ async def test_execute_error_handling(operator: Operator, mock_reasoner: AsyncMo
     workflow_message = WorkflowMessage(payload={"scratchpad": "Test scratchpad"}, job_id=job.id)
 
     with pytest.raises(Exception) as excinfo:
-        operator.execute(reasoner=mock_reasoner, workflow_messages=[workflow_message], job=job)
+        await operator.execute(
+            reasoner=mock_reasoner, workflow_messages=[workflow_message], job=job
+        )
 
     assert str(excinfo.value) == "Test error"

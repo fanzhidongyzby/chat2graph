@@ -5,7 +5,8 @@ from uuid import uuid4
 
 import yaml  # type: ignore
 
-from app.core.common.type import ReasonerType, WorkflowPlatformType
+from app.core.common.type import ReasonerType, ToolGroupType, ToolType, WorkflowPlatformType
+from app.core.toolkit.tool_config import McpConfig, McpTransportConfig, ToolGroupConfig
 
 
 @dataclass
@@ -13,8 +14,14 @@ class ToolConfig:
     """Tool configuration data class"""
 
     name: str
+    type: ToolType
+
+
+@dataclass
+class LocalToolConfig(ToolConfig):
+    """Local tool configuration data class"""
+
     module_path: str
-    id: str = field(default_factory=lambda: str(uuid4()))
 
 
 @dataclass
@@ -23,7 +30,7 @@ class ActionConfig:
 
     name: str
     desc: str
-    tools: List["ToolConfig"] = field(default_factory=list)
+    tools: List[Union[ToolConfig, ToolGroupConfig]] = field(default_factory=list)
     id: str = field(default_factory=lambda: str(uuid4()))
 
 
@@ -130,16 +137,30 @@ class AgenticConfig:
         reasoner_config = ReasonerConfig(type=ReasonerType(reasoner_dict.get("type", "DUAL")))
 
         # toolkit configuration (step 1): create all tool configurations
-        tools_dict: Dict[str, ToolConfig] = {}
+        tools_dict: Dict[str, Union[ToolConfig, ToolGroupConfig]] = {}
         for tool_dict in config_dict.get("tools", []):
             if not isinstance(tool_dict, dict):
                 raise ValueError(f"Tool configuration '{tool_dict}' must be a dictionary.")
 
-            tool_config = ToolConfig(
-                name=tool_dict.get("name", ""),
-                module_path=tool_dict.get("module_path", ""),
-                id=tool_dict.get("id", str(uuid4())),
-            )
+            tool_type: str = tool_dict.get("type", ToolType.LOCAL_TOOL.value)
+            if tool_type == ToolType.LOCAL_TOOL.value:
+                tool_config: Union[ToolConfig, ToolGroupConfig] = LocalToolConfig(
+                    name=tool_dict.get("name", ""),
+                    type=ToolType.LOCAL_TOOL,
+                    module_path=tool_dict.get("module_path", ""),
+                )
+            elif tool_type == ToolGroupType.MCP.value:
+                tool_config = McpConfig(
+                    type=ToolGroupType.MCP,
+                    name=tool_dict.get("name", ""),
+                    transport_config=McpTransportConfig.from_dict(
+                        tool_dict.get("mcp_transport_config", {})
+                    ),
+                )
+            else:
+                raise ValueError(
+                    f"Tool configuration '{tool_dict}' must be either LOCAL_TOOL or MCP."
+                )
             tools_dict[tool_config.name] = tool_config
 
         # toolkit configuration (step 2): create all action configurations
@@ -264,7 +285,7 @@ class AgenticConfig:
             result["reasoner"] = {"type": self.reasoner.type.value}
 
         # collect all tools and actions
-        all_tools: Dict[str, ToolConfig] = {}
+        all_tools: Dict[str, Union[ToolConfig, ToolGroupConfig]] = {}
         all_actions: Dict[str, ActionConfig] = {}
         for action_chain in self.toolkit:
             for action in action_chain:
@@ -275,7 +296,20 @@ class AgenticConfig:
         # tools exportation
         result["tools"] = []
         for tool in all_tools.values():
-            tool_dict = {"name": tool.name, "module_path": tool.module_path, "id": tool.id}
+            if isinstance(tool, LocalToolConfig):
+                tool_dict: Dict[str, Any] = {
+                    "name": tool.name,
+                    "type": tool.type.value,
+                    "module_path": tool.module_path,
+                }
+            elif isinstance(tool, McpConfig):
+                tool_dict = {
+                    "name": tool.name,
+                    "type": tool.type.value,
+                    "mcp_transport_config": tool.transport_config.to_dict(),
+                }
+            else:
+                raise ValueError(f"Unknown tool type: {type(tool)}")
             result["tools"].append(tool_dict)
 
         # actions exportation
@@ -287,10 +321,28 @@ class AgenticConfig:
                 "id": action.id,
             }
             if action.tools:
-                action_dict["tools"] = [
-                    {"name": tool.name, "module_path": tool.module_path, "id": tool.id}
-                    for tool in action.tools
-                ]
+                action_tools_list: List[Dict[str, Any]] = []
+                for tool in action.tools:
+                    if isinstance(tool, LocalToolConfig):
+                        action_tools_list.append(
+                            {
+                                "name": tool.name,
+                                "type": tool.type.value,
+                                "module_path": tool.module_path,
+                            }
+                        )
+                    elif isinstance(tool, McpConfig):
+                        action_tools_list.append(
+                            {
+                                "name": tool.name,
+                                "type": tool.type.value,
+                                "mcp_transport_config": tool.transport_config.to_dict(),
+                            }
+                        )
+                    else:
+                        raise ValueError(f"Unknown tool type: {type(tool)}")
+                action_dict["tools"] = action_tools_list
+
             result["actions"].append(action_dict)
 
         # toolkit exportation
@@ -305,10 +357,27 @@ class AgenticConfig:
                         "id": all_actions[action.name].id,
                     }
                     if action.tools:
-                        chain_action_dict["tools"] = [
-                            {"name": tool.name, "module_path": tool.module_path, "id": tool.id}
-                            for tool in action.tools
-                        ]
+                        action_tools_list = []
+                        for tool in action.tools:
+                            if isinstance(tool, LocalToolConfig):
+                                action_tools_list.append(
+                                    {
+                                        "name": tool.name,
+                                        "type": tool.type.value,
+                                        "module_path": tool.module_path,
+                                    }
+                                )
+                            elif isinstance(tool, McpConfig):
+                                action_tools_list.append(
+                                    {
+                                        "name": tool.name,
+                                        "type": tool.type.value,
+                                        "mcp_transport_config": tool.transport_config.to_dict(),
+                                    }
+                                )
+                            else:
+                                raise ValueError(f"Unknown tool type: {type(tool)}")
+                        chain_action_dict["tools"] = action_tools_list
                     chain_action_dicts.append(chain_action_dict)
             if chain_action_dicts:
                 result["toolkit"].append(chain_action_dicts)
@@ -356,14 +425,27 @@ class AgenticConfig:
                                         "id": action.id,
                                     }
                                     if action.tools:
-                                        op_action_dict["tools"] = [
-                                            {
-                                                "name": tool.name,
-                                                "module_path": tool.module_path,
-                                                "id": tool.id,
-                                            }
-                                            for tool in action.tools
-                                        ]
+                                        op_action_tools_list: List[Dict[str, Any]] = []
+                                        for tool in action.tools:
+                                            if isinstance(tool, LocalToolConfig):
+                                                op_action_tools_list.append(
+                                                    {
+                                                        "name": tool.name,
+                                                        "type": tool.type.value,
+                                                        "module_path": tool.module_path,
+                                                    }
+                                                )
+                                            elif isinstance(tool, McpConfig):
+                                                op_action_tools_list.append(
+                                                    {
+                                                        "name": tool.name,
+                                                        "type": tool.type.value,
+                                                        "mcp_transport_config": tool.transport_config.to_dict(),  # noqa: E501
+                                                    }
+                                                )
+                                            else:
+                                                raise ValueError(f"Unknown tool type: {type(tool)}")
+                                        op_action_dict["tools"] = op_action_tools_list
                                     op_action_dicts.append(op_action_dict)
                             op_dict["actions"] = op_action_dicts
                         op_chain_list.append(op_dict)

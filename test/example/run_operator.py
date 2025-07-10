@@ -1,18 +1,20 @@
+import asyncio
+
 import matplotlib.pyplot as plt
 
 from app.core.model.job import SubJob
 from app.core.service.reasoner_service import ReasonerService
-from app.core.service.service_factory import ServiceFactory
 from app.core.service.toolkit_service import ToolkitService
 from app.core.toolkit.action import Action
 from app.core.workflow.operator import Operator
 from app.core.workflow.operator_config import OperatorConfig
-from test.resource.tool_resource import Query
+from test.resource.init_server import init_server
+from test.resource.tool_resource import ExampleQuery
 
-ServiceFactory.initialize()
+init_server()
 
 
-def main():
+async def main():
     """Main function to demonstrate Operator usage."""
     # initialize
     action1 = Action(
@@ -31,8 +33,8 @@ def main():
         description="Generate response based on analysis",
     )
 
-    search_tool = Query(id="search_tool")
-    analyze_tool = Query(id="analyze_tool")
+    search_tool = ExampleQuery()
+    analyze_tool = ExampleQuery()
 
     # set operator properties
     instruction = """
@@ -121,7 +123,7 @@ Answer in Chinese.
         goal="Test goal",
         context=context,
     )
-    result = operator.execute(reasoner=reasoner, job=job)
+    result = await operator.execute(reasoner=reasoner, job=job)
 
     print(f"Operator execution result:\n{result}\n")
     print("Operator execution completed successfully")
@@ -130,4 +132,4 @@ Answer in Chinese.
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

@@ -7,36 +7,40 @@ from app.core.model.job import Job, SubJob
 from app.core.model.message import WorkflowMessage
 from app.core.model.task import Task
 from app.core.reasoner.reasoner import Reasoner
-from app.core.toolkit.tool import Tool
 from app.core.workflow.operator import Operator
 from app.core.workflow.operator_config import OperatorConfig
 from app.plugin.dbgpt.dbgpt_workflow import DbgptWorkflow
+from test.resource.init_server import init_server
+
+init_server()
 
 
 class TestReasoner(Reasoner):
     """Test reasoner"""
 
-    def infer(
-        self,
-        task: Task,
-        tools: Optional[List[Tool]] = None,
-    ) -> str:
+    async def infer(self, task: Task) -> str:
         """Infer by the reasoner."""
+        raise NotImplementedError("Infer method not implemented")
 
-    def update_knowledge(self, data: Any) -> None:
+    async def update_knowledge(self, data: Any) -> None:
         """Update the knowledge."""
+        raise NotImplementedError("Update knowledge method not implemented")
 
-    def evaluate(self, data: Any) -> Any:
+    async def evaluate(self, data: Any) -> Any:
         """Evaluate the inference process."""
+        raise NotImplementedError("Evaluate method not implemented")
 
-    def conclude(self, reasoner_memory: ReasonerMemory) -> str:
+    async def conclude(self, reasoner_memory: ReasonerMemory) -> str:
         """Conclude the inference results."""
+        raise NotImplementedError("Conclude method not implemented")
 
     def init_memory(self, task: Task) -> ReasonerMemory:
         """Initialize the memory."""
+        raise NotImplementedError("Init memory method not implemented")
 
     def get_memory(self, task: Task) -> ReasonerMemory:
         """Get the memory."""
+        raise NotImplementedError("Get memory method not implemented")
 
 
 @pytest.fixture
@@ -63,7 +67,7 @@ class MockOperator(Operator):
         self._config = OperatorConfig(id=id, instruction="Test instruction", actions=[])
         self._execution_order = execution_order
 
-    def execute(
+    async def execute(
         self,
         reasoner: Reasoner,
         job: Job,
@@ -129,7 +133,7 @@ def test_workflow_error_handling(job: Job, mock_reasoner: Reasoner):
     class ErrorOperator(MockOperator):
         """Operator that raises an error during execution."""
 
-        def execute(
+        async def execute(
             self,
             reasoner: Reasoner,
             job: Job,

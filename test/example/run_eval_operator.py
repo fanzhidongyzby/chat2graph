@@ -1,3 +1,5 @@
+import asyncio
+
 import matplotlib.pyplot as plt
 
 from app.core.common.type import WorkflowStatus
@@ -8,16 +10,16 @@ from app.core.prompt.eval_operator import (
     EVAL_OPERATION_OUTPUT_PROMPT,
 )
 from app.core.reasoner.mono_model_reasoner import MonoModelReasoner
-from app.core.service.service_factory import ServiceFactory
 from app.core.service.toolkit_service import ToolkitService
 from app.core.toolkit.action import Action
 from app.core.workflow.eval_operator import EvalOperator
 from app.core.workflow.operator_config import OperatorConfig
+from test.resource.init_server import init_server
 
-ServiceFactory.initialize()
+init_server()
 
 
-def main():
+async def main():
     """Main function to demonstrate Operator usage for the evaluation."""
     # initialize
     action1 = Action(
@@ -61,7 +63,7 @@ def main():
         payload={"scratchpad": "The end value is 21."},
         job_id=job.id,
     )
-    result: WorkflowMessage = operator.execute(
+    result: WorkflowMessage = await operator.execute(
         reasoner=reasoner,
         job=job,
         workflow_messages=[input_message_1, input_message_2],
@@ -83,4 +85,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

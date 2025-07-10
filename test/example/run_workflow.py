@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Any, List, Optional
 
@@ -10,6 +11,9 @@ from app.core.reasoner.reasoner import Reasoner
 from app.core.workflow.operator import Operator
 from app.core.workflow.operator_config import OperatorConfig
 from app.plugin.dbgpt.dbgpt_workflow import DbgptWorkflow
+from test.resource.init_server import init_server
+
+init_server()
 
 
 class TestReasoner(Reasoner):
@@ -49,7 +53,7 @@ class BaseTestOperator(Operator):
             actions=[],
         )
 
-    def execute(
+    async def execute(
         self,
         reasoner: Reasoner,
         job: Job,
@@ -66,7 +70,7 @@ class UpperOperator(BaseTestOperator):
     def __init__(self, id: str):
         super().__init__(id=id)
 
-    def execute(
+    async def execute(
         self,
         reasoner: Reasoner,
         job: Job,
@@ -91,7 +95,7 @@ class AddPrefixOperator(BaseTestOperator):
     def __init__(self, id: str):
         super().__init__(id=id)
 
-    def execute(
+    async def execute(
         self,
         reasoner: Reasoner,
         job: Job,
@@ -119,7 +123,7 @@ class AddSuffixOperator(BaseTestOperator):
     def __init__(self, id: str):
         super().__init__(id=id)
 
-    def execute(
+    async def execute(
         self,
         reasoner: Reasoner,
         job: Job,
@@ -144,7 +148,7 @@ class EvalOperator(BaseTestOperator):
     def __init__(self, id: str):
         super().__init__(id=id)
 
-    def execute(
+    async def execute(
         self,
         reasoner: Reasoner,
         job: Job,
@@ -173,7 +177,7 @@ class EvalOperator(BaseTestOperator):
         )
 
 
-def main():
+async def main():
     """Test parallel workflow: Upper -> Join <- Prefix"""
     job = SubJob(
         id="test_job_id",
@@ -204,4 +208,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

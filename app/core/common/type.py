@@ -114,3 +114,26 @@ class GraphDbType(Enum):
 
     NEO4J = "NEO4J"
     TUGRAPH = "TUGRAPH"
+
+
+class ToolType(Enum):
+    """Tool type enumeration"""
+
+    LOCAL_TOOL = "LOCAL_TOOL"
+    MCP_TOOL = "MCP_TOOL"
+
+
+class ToolGroupType(Enum):
+    """Tool set type enumeration"""
+
+    MCP = "MCP"
+    PACKAGE = "PACKAGE"
+
+
+class McpTransportType(Enum):
+    """MCP transport type enumeration"""
+
+    STDIO = "STDIO"
+    SSE = "SSE"
+    WEBSOCKET = "WEBSOCKET"
+    STREAMABLE_HTTP = "STREAMABLE_HTTP"

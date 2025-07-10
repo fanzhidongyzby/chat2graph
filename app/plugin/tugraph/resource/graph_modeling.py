@@ -1,9 +1,9 @@
 import json
 from typing import Dict, List, Optional, Set, Union
-from uuid import uuid4
 
 from app.core.common.system_env import SystemEnv
 from app.core.model.message import ModelMessage
+from app.core.model.task import ToolCallContext
 from app.core.reasoner.model_service_factory import ModelServiceFactory
 from app.core.service.graph_db_service import GraphDbService
 from app.core.toolkit.tool import Tool
@@ -348,9 +348,8 @@ DOC_CONTENT = """
 class DocumentReader(Tool):
     """Tool for analyzing document content."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.read_document.__name__,
             description=self.read_document.__doc__ or "",
             function=self.read_document,
@@ -373,9 +372,8 @@ class DocumentReader(Tool):
 class VertexLabelAdder(Tool):
     """Tool for generating Cypher statements to create vertex labels in TuGraph."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.create_vertex_label_by_json_schema.__name__,
             description=self.create_vertex_label_by_json_schema.__doc__ or "",
             function=self.create_vertex_label_by_json_schema,
@@ -453,9 +451,8 @@ class VertexLabelAdder(Tool):
 class EdgeLabelAdder(Tool):
     """Tool for generating Cypher statements to create edge labels in TuGraph."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.create_edge_label_by_json_schema.__name__,
             description=self.create_edge_label_by_json_schema.__doc__ or "",
             function=self.create_edge_label_by_json_schema,
@@ -537,9 +534,8 @@ class EdgeLabelAdder(Tool):
 class CypherExecutor(Tool):
     """Tool for validating and executing TuGraph Cypher schema definitions."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.validate_and_execute_cypher.__name__,
             description=self.validate_and_execute_cypher.__doc__ or "",
             function=self.validate_and_execute_cypher,
@@ -581,16 +577,21 @@ class CypherExecutor(Tool):
             message = ModelMessage(payload=cypher_schema, job_id="cypher_validation_id", step=1)
 
             _model = ModelServiceFactory.create(model_platform_type=SystemEnv.MODEL_PLATFORM_TYPE)
-            response = await _model.generate(sys_prompt=prompt, messages=[message])
+            response = await _model.generate(
+                sys_prompt=prompt,
+                messages=[message],
+                tool_call_ctx=ToolCallContext(
+                    job_id="cypher_validation_id", operator_id="op_id"
+                ),
+            )
             raise RuntimeError(response.get_payload()) from e
 
 
 class GraphReachabilityGetter(Tool):
     """Tool for getting the reachability information of the graph database."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.get_graph_reachability.__name__,
             description=self.get_graph_reachability.__doc__ or "",
             function=self.get_graph_reachability,

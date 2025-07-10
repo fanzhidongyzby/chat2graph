@@ -6,8 +6,7 @@ from app.core.common.type import MessageSourceType
 from app.core.memory.reasoner_memory import BuiltinReasonerMemory, ReasonerMemory
 from app.core.model.message import ModelMessage
 from app.core.model.task import Task
-from app.core.prompt.model_service import TASK_DESCRIPTOR_PROMPT_TEMPLATE
-from app.core.prompt.reasoner import ACTOR_PROMPT_TEMPLATE, META_THINKER_PROMPT_TEMPLATE
+from app.core.prompt.reasoner import ACTOR_PROMPT_TEMPLATE, THINKER_PROMPT_TEMPLATE
 from app.core.reasoner.model_service import ModelService
 from app.core.reasoner.model_service_factory import ModelServiceFactory
 from app.core.reasoner.reasoner import Reasoner
@@ -78,7 +77,9 @@ class DualModelReasoner(Reasoner):
         for _ in range(max_reasoning_rounds):
             # thinker
             response = await self._thinker_model.generate(
-                sys_prompt=thinker_sys_prompt, messages=reasoner_memory.get_messages()
+                sys_prompt=thinker_sys_prompt,
+                messages=reasoner_memory.get_messages(),
+                tool_call_ctx=task.get_tool_call_ctx(),
             )
             response.set_source_type(MessageSourceType.THINKER)
             reasoner_memory.add_message(response)
@@ -92,6 +93,7 @@ class DualModelReasoner(Reasoner):
                 sys_prompt=actor_sys_prompt,
                 messages=reasoner_memory.get_messages(),
                 tools=task.tools,
+                tool_call_ctx=task.get_tool_call_ctx(),
             )
             response.set_source_type(MessageSourceType.ACTOR)
             reasoner_memory.add_message(response)
@@ -170,55 +172,8 @@ class DualModelReasoner(Reasoner):
 
     def _format_actor_sys_prompt(self, task: Task) -> str:
         """Set the system prompt."""
-        # set the task description
-        task_description = task.operator_config.instruction if task.operator_config else ""
-
-        # set the task context
-        if task.insights:
-            env_info = "\n".join([f"{insight}" for insight in task.insights])
-        else:
-            env_info = "No environment information provided in this round."
-        if task.workflow_messages:
-            previous_input = "\n".join(
-                [f"{workflow_message.scratchpad}" for workflow_message in task.workflow_messages]
-            )
-        else:
-            previous_input = "No previous input provided in this round."
-        action_rels = "\n".join(
-            [f"[action {action.name}: {action.description}] -next-> " for action in task.actions]
-        )
-        file_desc = (
-            "\n".join(
-                f"File name: {f.name} - File id: {f.id}" for f in (task.file_descriptors or [])
-            )
-            or "No files provided in this round."
-        )
-
-        task_context = TASK_DESCRIPTOR_PROMPT_TEMPLATE.format(
-            action_rels=action_rels,
-            context=task.job.context,
-            session_id=task.job.session_id,
-            job_id=task.job.id,
-            file_descriptors=file_desc,
-            env_info=env_info,
-            knowledge=task.knowledge.get_payload() if task.knowledge else "",
-            previous_input=previous_input,
-            lesson=task.lesson or "No lesson learned in this round.",
-        )
-
-        # set the reasoning task
-        reasoning_task = f"=====\nTASK:\n{task_description}\nCONTEXT:\n{task_context}\n====="
-
-        # set the function docstrings
-        if len(task.tools) > 0:
-            func_description = "\n".join(
-                [
-                    f"({i + 1}) Function {tool.name}():\n\t{tool.description}\n"
-                    for i, tool in enumerate(task.tools)
-                ]
-            )
-        else:
-            func_description = "No function calling in this round."
+        task_context = self._build_task_context(task)
+        func_description = self._build_func_description(task)
 
         if task.operator_config and task.operator_config.output_schema:
             output_schema = (
@@ -233,72 +188,29 @@ class DualModelReasoner(Reasoner):
             thinker_name=self._thinker_name,
             max_reasoning_rounds=SystemEnv.MAX_REASONING_ROUNDS,
             language=SystemEnv.LANGUAGE,
-            task=reasoning_task,
+            task=task.operator_config.instruction
+            if task.operator_config
+            else "No specific instructions to execute.",
+            context=task_context,
             functions=func_description,
             output_schema=output_schema,
         )
 
     def _format_thinker_sys_prompt(self, task: Task) -> str:
         """Set the system prompt."""
-        # set the task description
-        task_description = task.operator_config.instruction if task.operator_config else ""
-        # set the task context
-        if task.insights:
-            env_info = "\n".join([f"{insight}" for insight in task.insights])
-        else:
-            env_info = "No environment information provided in this round."
-        if task.workflow_messages:
-            previous_input = "\n".join(
-                [
-                    f"{str(workflow_message.scratchpad)}"
-                    for workflow_message in task.workflow_messages
-                ]
-            )
-        else:
-            previous_input = "No scratchpad provided in this round."
-        action_rels = "\n".join(
-            [f"[{action.name}: {action.description}] -next-> " for action in task.actions]
-        )
-        file_desc = (
-            "\n".join(
-                f"File name: {f.name} - File id: {f.id}" for f in (task.file_descriptors or [])
-            )
-            or "No files provided in this round."
-        )
-
-        task_context = TASK_DESCRIPTOR_PROMPT_TEMPLATE.format(
-            action_rels=action_rels,
-            context=task.job.context,
-            session_id=task.job.session_id,
-            job_id=task.job.id,
-            file_descriptors=file_desc,
-            env_info=env_info,
-            knowledge=task.knowledge.get_payload() if task.knowledge else "",
-            previous_input=previous_input,
-            lesson=task.lesson or "No lesson learned in this round.",
-        )
-
-        # set the reasoning task
-        reasoning_task = f"=====\nTASK:\n{task_description}\nCONTEXT:\n{task_context}\n====="
-
-        # set the function docstrings
-        if len(task.tools) > 0:
-            func_description = "\n".join(
-                [
-                    f"({i + 1}) Function {tool.name}():\n\t{tool.description}\n"
-                    for i, tool in enumerate(task.tools)
-                ]
-            )
-        else:
-            func_description = "No function calling in this round."
+        task_context = self._build_task_context(task)
+        func_description = self._build_func_description(task)
 
         # TODO: The prompt template comes from the <system-name>.config.yaml
-        return META_THINKER_PROMPT_TEMPLATE.format(
+        return THINKER_PROMPT_TEMPLATE.format(
             actor_name=self._actor_name,
             thinker_name=self._thinker_name,
             max_reasoning_rounds=SystemEnv.MAX_REASONING_ROUNDS,
             language=SystemEnv.LANGUAGE,
-            task=reasoning_task,
+            task=task.operator_config.instruction
+            if task.operator_config
+            else "No specific instructions to execute.",
+            context=task_context,
             functions=func_description,
         )
 

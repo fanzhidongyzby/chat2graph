@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict
 from uuid import uuid4
 
-from app.core.common.type import FunctionCallStatus
+from app.core.common.type import FunctionCallStatus, ToolType
 
 
 @dataclass
@@ -34,11 +34,61 @@ class FunctionCallResult:
         )
 
 
-@dataclass
 class Tool:
-    """Tool in the toolkit."""
+    """Tool in the toolkit.
 
-    name: str
-    description: str
-    function: Callable
-    id: str = field(default_factory=lambda: str(uuid4()))
+    Attributes:
+        _id: Unique identifier for the tool, auto-generated.
+        _name: Name of the tool.
+        _description: Description of the tool, will be shown to the LLM.
+        _function: Callable function that can be invoked by the LLM.
+        _tool_type: Type of the tool, default is LOCAL_TOOL.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        function: Callable,
+        tool_type: ToolType = ToolType.LOCAL_TOOL,
+    ):
+        """Initialize the Tool with name, description, and optional function."""
+        self._id: str = str(uuid4())
+        self._name: str = name
+        self._description: str = description
+        self._type: ToolType = tool_type
+        self._function: Callable = function
+
+    @property
+    def id(self) -> str:
+        """Get the unique identifier of the tool."""
+        return self._id
+
+    @property
+    def name(self) -> str:
+        """Get the name of the tool."""
+        return self._name
+
+    @property
+    def description(self) -> str:
+        """Get the description of the tool."""
+        return self._description
+
+    @property
+    def tool_type(self) -> ToolType:
+        """Get the type of the tool."""
+        return self._type
+
+    @property
+    def function(self) -> Callable:
+        """Get the callable function of the tool."""
+        return self._function
+
+    def copy(self) -> "Tool":
+        """Create a copy of the tool."""
+        return Tool(
+            name=self._name,
+            description=self._description,
+            function=self._function,
+            tool_type=self._type,
+        )

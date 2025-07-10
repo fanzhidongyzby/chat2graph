@@ -5,9 +5,11 @@ from matplotlib.lines import Line2D
 import matplotlib.pyplot as plt
 import networkx as nx  # type: ignore
 
+from app.core.common.async_func import run_async_function
 from app.core.common.singleton import Singleton
 from app.core.toolkit.action import Action
 from app.core.toolkit.tool import Tool
+from app.core.toolkit.tool_group import ToolGroup
 from app.core.toolkit.toolkit import Toolkit
 
 # use non-interactive backend for matplotlib, to avoid blocking
@@ -49,11 +51,59 @@ class ToolkitService(metaclass=Singleton):
                 self.get_toolkit().set_score(action.id, tool.id, score)
                 has_connected_actions = True
             else:
-                print(f"warning: Action {action.id} not in the toolkit graph")
+                print(f"warning: Action {action.name} ({action.id}) not in the toolkit graph")
 
         if not has_connected_actions:
-            print(f"warning: Tool {tool.id} has no connected actions")
+            print(f"warning: Tool {tool.name} ({tool.id}) has no connected actions")
             self.get_toolkit().remove_vertex(tool.id)
+
+    def add_tool_group(
+        self, tool_group: ToolGroup, connected_actions: List[Tuple[Action, float]]
+    ) -> None:
+        """Add a tool group to the toolkit graph. ToolGroup: Tool_1, Tool_2, ... <--Call-- Action,
+        and ToolGroup --Group_Has_Tool--> Tool.
+
+        Args:
+            tool_group (ToolGroup): The tool group to be added
+        """
+        toolkit = self.get_toolkit()
+        group_id = tool_group.get_id()
+
+        # add tool group vertex if not exists
+        if group_id not in toolkit.vertices():
+            toolkit.add_vertex(group_id, data=tool_group)
+        else:
+            # clean up old tools directly, avoiding complex cascades from remove_tool
+            # action --Call--> Tool <-- Group_Has_Tool -- ToolGroup
+
+            # tools that are connected to this group
+            tools_in_group = set(toolkit.successors(group_id))
+
+            # tools that are called by the relevant actions
+            called_tools: Set[str] = set()
+            for action, _ in connected_actions:
+                if action.id in toolkit.vertices():
+                    for successor_id in toolkit.successors(action.id):
+                        if toolkit.get_tool(successor_id) is not None:
+                            called_tools.add(successor_id)
+
+            # find the intersection: tools that belong to this group AND are called by these actions
+            tools_to_remove = tools_in_group & called_tools
+
+            for tool_id in tools_to_remove:
+                if toolkit._graph.has_node(tool_id):
+                    toolkit._graph.remove_node(tool_id)
+                    toolkit._tools.pop(tool_id, None)
+
+            # re-add/update the tool group data
+            toolkit.add_vertex(group_id, data=tool_group)
+
+        # create and store tools listed in the tool group
+        tools: List[Tool] = run_async_function(tool_group.list_tools)
+        for tool in tools:
+            self.add_tool(tool, connected_actions=connected_actions)
+            toolkit.add_edge(group_id, tool.id)
+            toolkit.set_score(group_id, tool.id, 1.0)  # default score
 
     def add_action(
         self,
@@ -86,18 +136,18 @@ class ToolkitService(metaclass=Singleton):
                 self.get_toolkit().add_edge(prev_action.id, action.id)
                 self.get_toolkit().set_score(prev_action.id, action.id, score)
 
-    def get_action(self, id: str, action_id: str) -> Action:
+    def get_action(self, action_id: str) -> Action:
         """Get action from the toolkit graph."""
         action: Optional[Action] = self.get_toolkit().get_action(action_id)
         if not action:
             raise ValueError(f"Action {action_id} not found in the toolkit graph")
         return action
 
-    def remove_tool(self, id: str, tool_id: str):
+    def remove_tool(self, tool_id: str):
         """Remove tool from the toolkit graph."""
         self.get_toolkit().remove_vertex(tool_id)
 
-    def remove_action(self, id: str, action_id: str):
+    def remove_action(self, action_id: str):
         """Remove action from the toolkit graph."""
         self.get_toolkit().remove_vertex(action_id)
 

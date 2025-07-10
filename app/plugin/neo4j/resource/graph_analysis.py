@@ -9,9 +9,8 @@ from app.core.toolkit.tool import Tool
 class AlgorithmsGetter(Tool):
     """Tool to get all algorithms from the graph database."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.get_algorithms.__name__,
             description=self.get_algorithms.__doc__ or "",
             function=self.get_algorithms,
@@ -80,9 +79,8 @@ class AlgorithmsGetter(Tool):
 class PageRankExecutor(Tool):
     """Tool to execute the PageRank algorithm on the graph database."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.execute_page_rank_algorithm.__name__,
             description=self.execute_page_rank_algorithm.__doc__ or "",
             function=self.execute_page_rank_algorithm,
@@ -204,9 +202,8 @@ class PageRankExecutor(Tool):
 class BetweennessCentralityExecutor(Tool):
     """Tool to execute the Betweenness Centrality algorithm on the graph database."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.execute_betweenness_centrality_algorithm.__name__,
             description=self.execute_betweenness_centrality_algorithm.__doc__ or "",
             function=self.execute_betweenness_centrality_algorithm,
@@ -338,9 +335,8 @@ class BetweennessCentralityExecutor(Tool):
 class LouvainExecutor(Tool):
     """Tool to execute the Louvain community detection algorithm on the graph database."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.execute_louvain_algorithm.__name__,
             description=self.execute_louvain_algorithm.__doc__ or "",
             function=self.execute_louvain_algorithm,
@@ -518,9 +514,8 @@ class LouvainExecutor(Tool):
 class LabelPropagationExecutor(Tool):
     """Tool to execute the Label Propagation community detection algorithm on the graph database."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.execute_label_propagation_algorithm.__name__,
             description=self.execute_label_propagation_algorithm.__doc__ or "",
             function=self.execute_label_propagation_algorithm,
@@ -702,9 +697,8 @@ class LabelPropagationExecutor(Tool):
 class ShortestPathExecutor(Tool):
     """Tool to execute the Shortest Path algorithm on the graph database."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.execute_shortest_path_algorithm.__name__,
             description=self.execute_shortest_path_algorithm.__doc__ or "",
             function=self.execute_shortest_path_algorithm,
@@ -959,9 +953,8 @@ class ShortestPathExecutor(Tool):
 class NodeSimilarityExecutor(Tool):
     """Tool to execute the Node Similarity algorithm on the graph database."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.execute_node_similarity_algorithm.__name__,
             description=self.execute_node_similarity_algorithm.__doc__ or "",
             function=self.execute_node_similarity_algorithm,
@@ -1133,9 +1126,8 @@ class NodeSimilarityExecutor(Tool):
 class CommonNeighborsExecutor(Tool):
     """Tool to execute the Common Neighbors algorithm on the graph database."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.execute_common_neighbors_algorithm.__name__,
             description=self.execute_common_neighbors_algorithm.__doc__ or "",
             function=self.execute_common_neighbors_algorithm,
@@ -1259,9 +1251,8 @@ class CommonNeighborsExecutor(Tool):
 class KMeansExecutor(Tool):
     """Tool to execute the K-Means clustering algorithm on the graph database."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.execute_kmeans_algorithm.__name__,
             description=self.execute_kmeans_algorithm.__doc__ or "",
             function=self.execute_kmeans_algorithm,

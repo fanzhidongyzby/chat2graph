@@ -1,10 +1,10 @@
 import json
 import re
-from typing import Any, Dict, List, Optional
-from uuid import uuid4
+from typing import Any, Dict, List
 
 from app.core.common.system_env import SystemEnv
 from app.core.model.message import ModelMessage
+from app.core.model.task import ToolCallContext
 from app.core.reasoner.model_service_factory import ModelServiceFactory
 from app.core.service.graph_db_service import GraphDbService
 from app.core.toolkit.tool import Tool
@@ -171,9 +171,8 @@ DOC_CONTENT = """
 class DocumentReader(Tool):
     """Tool for analyzing document content."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.read_document.__name__,
             description=self.read_document.__doc__ or "",
             function=self.read_document,
@@ -196,9 +195,8 @@ class DocumentReader(Tool):
 class SchemaGetter(Tool):
     """Tool for getting the schema of a graph database."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.get_schema.__name__,
             description=self.get_schema.__doc__ or "",
             function=self.get_schema,
@@ -231,9 +229,8 @@ class SchemaGetter(Tool):
 class CypherExecutor(Tool):
     """Tool for validating and executing TuGraph Cypher schema definitions."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.validate_and_execute_cypher.__name__,
             description=self.validate_and_execute_cypher.__doc__ or "",
             function=self.validate_and_execute_cypher,
@@ -285,16 +282,21 @@ class CypherExecutor(Tool):
             message = ModelMessage(payload=cypher, job_id="validate_and_execute_cypher_id", step=1)
 
             _model = ModelServiceFactory.create(model_platform_type=SystemEnv.MODEL_PLATFORM_TYPE)
-            response = await _model.generate(sys_prompt=prompt, messages=[message])
+            response = await _model.generate(
+                sys_prompt=prompt,
+                messages=[message],
+                tool_call_ctx=ToolCallContext(
+                    job_id="validate_and_execute_cypher_id", operator_id="op_id"
+                ),
+            )
             raise Exception(response.get_payload()) from e
 
 
 class DataImport(Tool):
     """Tool for importing data into a graph database."""
 
-    def __init__(self, id: Optional[str] = None):
+    def __init__(self):
         super().__init__(
-            id=id or str(uuid4()),
             name=self.import_data.__name__,
             description=self.import_data.__doc__ or "",
             function=self.import_data,

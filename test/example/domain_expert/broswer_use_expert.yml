@@ -1,0 +1,123 @@
+# application basic information configuration
+app:
+  name: "WebResearchExpert"
+  desc: "An Agentic System for Advanced Web Research and Synthesis."
+  version: "2.1.0"
+
+# plugin configuration
+plugin:
+  workflow_platform: "DBGPT"
+
+# reasoner configuration
+reasoner:
+  type: "DUAL"
+
+# tool definitions
+tools:
+  - &browser_tool
+    name: "BrowserUsing"
+    desc: "A comprehensive web browser tool. Can execute single or multiple browsing tasks in parallel, supporting navigation, clicking, input, and content extraction operations."
+    type: "MCP"
+    mcp_transport_config:
+      transport_type: "STDIO"
+      command: "npx"
+      args: ["@playwright/mcp@latest", "--isolated"]
+
+  - &knowledge_base_retriever_tool
+    name: "KnowledgeBaseRetriever"
+    desc: "Retrieves relevant documents from the internal knowledge base to enhance and supplement web research findings."
+    type: "LOCAL_TOOL"
+    module_path: "app.plugin.neo4j.resource.question_answering"
+
+# action definitions
+actions:
+  # phase 1: Strategic Planning
+  - &web_search_planning_action
+    name: "web_search_planning"
+    desc: "Analyzes user questions and formulates comprehensive web research strategies. Includes identifying key issues, designing multiple search vectors (keywords, authoritative sources), and planning timely parallel information collection paths."
+    tools: []
+
+  # phase 2: Information Collection
+  - &web_browsing_action
+    name: "web_browsing"
+    desc: "Executes research plans through web interactions. Can concurrently execute multiple independent browsing tasks to maximize efficiency. This action is responsible for collecting raw information and can dynamically adjust its approach based on preliminary findings."
+    tools:
+      - *browser_tool
+
+  # phase 3: Knowledge Synthesis
+  - &information_synthesis_action
+    name: "information_synthesis"
+    desc: "Critically analyzes, evaluates, and synthesizes collected information. Identifies key findings, confirms facts, resolves contradictions, and builds coherent knowledge structures from different sources."
+    tools: []
+
+  # phase 4: Verification and Citation
+  - &fact_verification_and_citation_action
+    name: "fact_verification_and_citation"
+    desc: "Conducts final review of synthesized information for accuracy and completeness. Identifies any remaining knowledge gaps and prepares precise citations for all referenced web and knowledge base sources."
+    tools:
+      - *browser_tool
+      - *knowledge_base_retriever_tool
+
+  - &job_decomposition_action
+    name: "job_decomposition"
+    desc: "Manually decomposes tasks into multiple subtasks (jobs) according to relevant requirements and assigns each subtask to the corresponding expert."
+
+# toolkit definitions
+toolkit:
+  - [*web_search_planning_action, *web_browsing_action, *information_synthesis_action, *fact_verification_and_citation_action]
+  - [*job_decomposition_action]
+
+# operator definitions
+operators:
+  - &web_research_operator
+    instruction: |
+      You are a world-class web research intelligent agent, proficient in digital information retrieval and analysis. Your mission is to provide comprehensive, accurate, and synthesized answers to complex questions through rigorous web research.
+
+      **Your core working principles:**
+      1. **Strategize Before Acting:** Always first deconstruct the problem and formulate a multi-pronged research plan. Pre-consider different search terms and authoritative information sources.
+      2. **Maximize Efficiency:** When possible, plan and execute independent search tasks in parallel to reduce the total time to obtain answers.
+      3. **Be Resilient:** Small setbacks are normal. If navigation fails or pages cannot load, demonstrate your resilience by retrying once or twice, then re-evaluate the strategy. Don't give up due to temporary errors.
+      4. **Think Critically:** Never take surface information at face value. Actively cross-verify between independent, reputable sources. Acknowledge and report any contradictions or knowledge gaps.
+      5. **Synthesize, Don't Just List:** Your final output should be a coherent, well-structured narrative that synthesizes findings into a complete answer, not just a collection of facts.
+
+      **Your workflow:**
+      1. **Planning (`web_search_planning`):** Develop a detailed research strategy.
+      2. **Browsing (`web_browsing`):** Execute that strategy, leveraging parallel browsing to accelerate the process, and adapt to new discoveries as they emerge.
+      3. **Synthesis (`information_synthesis`):** Integrate all findings into a unified understanding.
+      4. **Verification & Citation (`fact_verification_and_citation`):** Carefully check your conclusions and cite sources for every piece of information.
+    output_schema: |
+      **Research Summary**: A high-level overview of the entire research process, key findings, and any significant challenges encountered.
+      **Comprehensive Answer**: A detailed, comprehensive response to the user's question, logically clear and well-structured.
+      **Source Analysis & Citations**: A combined section that lists all sources with brief commentary on their credibility.
+        - **Web Citations**:
+          [1] [Web Page Title 1](URL 1) - (e.g., Official documentation, high credibility)
+          [2] [Blog Post Title 2](URL 2) - (e.g., Expert opinion, provides practical cases)
+          ...
+        - **Knowledge Base Citations**:
+          [KB-1] Document name or ID - (e.g., Internal technical brief)
+      **Identified Knowledge Gaps**: Clearly state where exact information could not be found or where information contradicts.
+    actions:
+      - *web_search_planning_action
+      - *web_browsing_action
+      - *information_synthesis_action
+      - *fact_verification_and_citation_action
+
+# expert definitions
+experts:
+  - profile:
+      name: "Broswer Use Expert"
+      desc: |
+        An autonomous and efficient web intelligence expert focused on deep research and information synthesis. This expert excels at creating and executing complex research plans, including accelerating through parallel information collection. They are designed to be resilient, able to retry when encountering transient errors, and adjust strategies when facing obstacles. Their final output is not just a collection of facts, but a report that has undergone critical analysis and includes complete citations, aimed at providing comprehensive understanding of the topic.
+    reasoner:
+      actor_name: "Broswer Use Expert"
+      thinker_name: "Broswer Use Expert"
+    workflow:
+      - [*web_research_operator]
+
+# leader definition
+leader:
+  actions: [*job_decomposition_action]
+
+knowledgebase: {}
+memory: {}
+env: {}
